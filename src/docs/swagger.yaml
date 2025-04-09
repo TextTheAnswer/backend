@@ -1,0 +1,22 @@
+openapi: 3.0.0
+info:
+  title: Text the Answer API
+  description: API documentation for Text the Answer trivia game
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+tags:
+  - name: Leaderboard
+    description: Leaderboard management endpoints
+
+paths: {}

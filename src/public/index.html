@@ -1,0 +1,300 @@
+.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text the Answer API Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+        .container { max-width: 800px; }
+        .response { white-space: pre-wrap; }
+        .card { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container my-5">
+        <h1>Text the Answer API Test</h1>
+        
+        <!-- Authentication Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Authentication</h2>
+            </div>
+            <div class="card-body">
+                <h3>Register</h3>
+                <form id="registerForm" class="mb-4">
+                    <div class="mb-3">
+                        <input type="email" class="form-control" placeholder="Email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <input type="password" class="form-control" placeholder="Password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" placeholder="Name" name="name" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+
+                <h3>Login</h3>
+                <form id="loginForm" class="mb-4">
+                    <div class="mb-3">
+                        <input type="email" class="form-control" placeholder="Email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <input type="password" class="form-control" placeholder="Password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+
+                <div class="mb-3">
+                    <button id="getProfile" class="btn btn-info">Get Profile</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Quiz Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Daily Quiz</h2>
+            </div>
+            <div class="card-body">
+                <button id="getDailyQuiz" class="btn btn-primary mb-3">Get Daily Questions</button>
+                <div id="quizContainer" class="d-none">
+                    <div id="questionDisplay" class="mb-3"></div>
+                    <div id="optionsContainer" class="mb-3"></div>
+                    <button id="submitAnswer" class="btn btn-success">Submit Answer</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multiplayer Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Multiplayer</h2>
+            </div>
+            <div class="card-body">
+                <h3>Create Lobby</h3>
+                <form id="createLobbyForm" class="mb-4">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" placeholder="Lobby Name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="isPublic" checked>
+                            <label class="form-check-label">Public Lobby</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <input type="number" class="form-control" placeholder="Max Players" name="maxPlayers" min="2" max="10" value="5">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Lobby</button>
+                </form>
+
+                <h3>Join Lobby</h3>
+                <form id="joinLobbyForm" class="mb-4">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" placeholder="Lobby Code" name="code" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Join Lobby</button>
+                </form>
+
+                <button id="getLobbies" class="btn btn-info mb-3">Get Public Lobbies</button>
+            </div>
+        </div>
+
+        <!-- Subscription Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Subscription</h2>
+            </div>
+            <div class="card-body">
+                <button id="createCheckout" class="btn btn-primary mb-3">Subscribe to Premium</button>
+                <button id="getSubscription" class="btn btn-info mb-3">Get Subscription Details</button>
+                <button id="cancelSubscription" class="btn btn-danger mb-3">Cancel Subscription</button>
+            </div>
+        </div>
+
+        <!-- Response Display -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Response</h2>
+            </div>
+            <div class="card-body">
+                <pre id="response" class="response bg-light p-3"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token');
+        let currentQuestion = null;
+        let socket = null;
+
+        // Helper function to make API calls
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const options = {
+                    method,
+                    headers
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(`/api${endpoint}`, options);
+                const data = await response.json();
+                
+                document.getElementById('response').textContent = JSON.stringify(data, null, 2);
+                return data;
+            } catch (error) {
+                document.getElementById('response').textContent = error.message;
+                throw error;
+            }
+        }
+
+        // Authentication
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = await apiCall('/auth/register', 'POST', Object.fromEntries(formData));
+            if (data.token) {
+                token = data.token;
+                localStorage.setItem('token', token);
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = await apiCall('/auth/login', 'POST', Object.fromEntries(formData));
+            if (data.token) {
+                token = data.token;
+                localStorage.setItem('token', token);
+            }
+        });
+
+        document.getElementById('getProfile').addEventListener('click', () => {
+            apiCall('/auth/profile');
+        });
+
+        // Daily Quiz
+        document.getElementById('getDailyQuiz').addEventListener('click', async () => {
+            const data = await apiCall('/quiz/daily');
+            if (data.success && data.questions.length > 0) {
+                currentQuestion = data.questions[0];
+                displayQuestion(currentQuestion);
+            }
+        });
+
+        function displayQuestion(question) {
+            const container = document.getElementById('quizContainer');
+            const questionDisplay = document.getElementById('questionDisplay');
+            const optionsContainer = document.getElementById('optionsContainer');
+
+            container.classList.remove('d-none');
+            questionDisplay.textContent = question.text;
+            
+            optionsContainer.innerHTML = '';
+            question.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.className = 'btn btn-outline-primary m-2';
+                button.textContent = option;
+                button.dataset.index = index;
+                button.onclick = () => selectAnswer(index);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        let selectedAnswer = null;
+        function selectAnswer(index) {
+            selectedAnswer = index;
+            const buttons = document.querySelectorAll('#optionsContainer button');
+            buttons.forEach(button => button.classList.remove('active'));
+            buttons[index].classList.add('active');
+        }
+
+        document.getElementById('submitAnswer').addEventListener('click', async () => {
+            if (currentQuestion && selectedAnswer !== null) {
+                await apiCall('/quiz/daily/submit', 'POST', {
+                    questionId: currentQuestion.id,
+                    answer: selectedAnswer
+                });
+                selectedAnswer = null;
+            }
+        });
+
+        // Multiplayer
+        document.getElementById('createLobbyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            await apiCall('/game/lobby', 'POST', {
+                name: formData.get('name'),
+                isPublic: formData.get('isPublic') === 'on',
+                maxPlayers: parseInt(formData.get('maxPlayers'))
+            });
+        });
+
+        document.getElementById('joinLobbyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            await apiCall('/game/lobby/join', 'POST', {
+                code: formData.get('code')
+            });
+        });
+
+        document.getElementById('getLobbies').addEventListener('click', () => {
+            apiCall('/game/lobbies');
+        });
+
+        // Subscription
+        document.getElementById('createCheckout').addEventListener('click', async () => {
+            const data = await apiCall('/subscription/checkout', 'POST');
+            if (data.success && data.url) {
+                window.location.href = data.url;
+            }
+        });
+
+        document.getElementById('getSubscription').addEventListener('click', () => {
+            apiCall('/subscription/details');
+        });
+
+        document.getElementById('cancelSubscription').addEventListener('click', () => {
+            apiCall('/subscription/cancel', 'POST');
+        });
+
+        // Socket.IO Connection
+        function connectSocket() {
+            if (!token) return;
+
+            socket = io('http://localhost:3000', {
+                auth: {
+                    token
+                }
+            });
+
+            socket.on('connect', () => {
+                console.log('Socket connected');
+            });
+
+            socket.on('error', (error) => {
+                document.getElementById('response').textContent = `Socket Error: ${error.message}`;
+            });
+        }
+
+        // Initialize socket connection when token is available
+        if (token) {
+            connectSocket();
+        }
+    </script>
+</body>
+</html>
