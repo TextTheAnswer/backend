@@ -18,4 +18,7 @@ router.get('/profile', authenticate, authController.getProfile);
 // Logout user
 router.post('/logout', authenticate, authController.logout);
 
+// Verify student email
+router.get('/verify-student/:token', authController.verifyStudentEmail);
+
 module.exports = router;

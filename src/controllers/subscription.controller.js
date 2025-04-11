@@ -240,7 +240,7 @@ exports.awardFreePremiumMonth = async (req, res) => {
     }
     
     // Award free month
-    await awardFreePremium(user);
+    await exports.awardFreePremium(user);
     
     res.status(200).json({
       success: true,
@@ -426,58 +426,37 @@ async function handleInvoicePaymentFailed(invoice) {
   }
 }
 
-// Helper function to award free premium month
-async function awardFreePremium(user) {
+// Helper function to award free premium month to a user
+exports.awardFreePremium = async function(user) {
   try {
-    // Check if user already has premium
-    if (user.isPremium()) {
-      // If user already has premium, extend by one month
-      const currentEnd = user.subscription.currentPeriodEnd || new Date();
-      const newEnd = new Date(currentEnd);
-      newEnd.setMonth(newEnd.getMonth() + 1);
-      
-      user.subscription.currentPeriodEnd = newEnd;
-    } else {
-      // If user doesn't have premium, give them a month
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1);
-      
-      user.subscription.status = 'premium';
-      user.subscription.currentPeriodEnd = endDate;
-      user.subscription.freeTrialUsed = true;
-    }
+    // Calculate end date (1 month from now)
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + 1);
     
-    // Save the user
+    // Update user's subscription
+    user.subscription.status = 'premium';
+    user.subscription.currentPeriodEnd = endDate;
+    user.subscription.isFreeAward = true; // Flag to indicate this was a free award
+    
     await user.save();
     
-    // Create or update subscription record
-    let subscription = await Subscription.findOne({ user: user._id });
+    // Create a record in the Subscription model
+    const subscription = new Subscription({
+      user: user._id,
+      status: 'active',
+      plan: 'premium',
+      isFreeAward: true,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: endDate,
+      notes: 'Free month awarded for daily quiz leaderboard win'
+    });
     
-    if (!subscription && user.subscription.stripeCustomerId) {
-      subscription = new Subscription({
-        user: user._id,
-        stripeCustomerId: user.subscription.stripeCustomerId,
-        status: 'active',
-        plan: 'premium',
-        currentPeriodEnd: user.subscription.currentPeriodEnd,
-        freeMonthAward: true
-      });
-    } else if (subscription) {
-      subscription.status = 'active';
-      subscription.currentPeriodEnd = user.subscription.currentPeriodEnd;
-      subscription.freeMonthAward = true;
-    }
+    await subscription.save();
     
-    if (subscription) {
-      await subscription.save();
-    }
-    
+    console.log(`Free premium month awarded to user ${user._id} until ${endDate}`);
     return true;
   } catch (error) {
     console.error('Error awarding free premium:', error);
-    throw error;
+    return false;
   }
-}
-
-// Export helper function for use in other controllers
-exports.awardFreePremium = awardFreePremium;
+};

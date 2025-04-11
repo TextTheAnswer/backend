@@ -1,300 +1,618 @@
-.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text the Answer API Test</title>
+    <title>Text the Answer API Tester</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <style>
-        .container { max-width: 800px; }
-        .response { white-space: pre-wrap; }
-        .card { margin-bottom: 20px; }
+        .container { max-width: 1200px; }
+        .endpoint-card { margin-bottom: 20px; }
+        pre.response { max-height: 300px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 5px; }
+        .auth-warning { display: none; color: #dc3545; margin-top: 10px; }
+        #auth-status { font-weight: bold; }
+        .nav-tabs { margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        
     </style>
 </head>
 <body>
-    <div class="container my-5">
-        <h1>Text the Answer API Test</h1>
+    <div class="container mt-4">
+        <h1 class="mb-4">Text the Answer API Tester</h1>
         
-        <!-- Authentication Section -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Authentication</h2>
-            </div>
-            <div class="card-body">
-                <h3>Register</h3>
-                <form id="registerForm" class="mb-4">
-                    <div class="mb-3">
-                        <input type="email" class="form-control" placeholder="Email" name="email" required>
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Authentication</h5>
                     </div>
-                    <div class="mb-3">
-                        <input type="password" class="form-control" placeholder="Password" name="password" required>
-                    </div>
-                    <div class="mb-3">
-                        <input type="text" class="form-control" placeholder="Name" name="name" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Register</button>
-                </form>
-
-                <h3>Login</h3>
-                <form id="loginForm" class="mb-4">
-                    <div class="mb-3">
-                        <input type="email" class="form-control" placeholder="Email" name="email" required>
-                    </div>
-                    <div class="mb-3">
-                        <input type="password" class="form-control" placeholder="Password" name="password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Login</button>
-                </form>
-
-                <div class="mb-3">
-                    <button id="getProfile" class="btn btn-info">Get Profile</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Daily Quiz Section -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Daily Quiz</h2>
-            </div>
-            <div class="card-body">
-                <button id="getDailyQuiz" class="btn btn-primary mb-3">Get Daily Questions</button>
-                <div id="quizContainer" class="d-none">
-                    <div id="questionDisplay" class="mb-3"></div>
-                    <div id="optionsContainer" class="mb-3"></div>
-                    <button id="submitAnswer" class="btn btn-success">Submit Answer</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Multiplayer Section -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Multiplayer</h2>
-            </div>
-            <div class="card-body">
-                <h3>Create Lobby</h3>
-                <form id="createLobbyForm" class="mb-4">
-                    <div class="mb-3">
-                        <input type="text" class="form-control" placeholder="Lobby Name" name="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="isPublic" checked>
-                            <label class="form-check-label">Public Lobby</label>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <span>Status: <span id="auth-status">Not authenticated</span></span>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <button id="login-btn" class="btn btn-primary">Login</button>
+                                <button id="register-btn" class="btn btn-success">Register</button>
+                                <button id="logout-btn" class="btn btn-warning" disabled>Logout</button>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="input-group">
+                                    <input type="text" id="token-input" class="form-control" placeholder="JWT Token" readonly>
+                                    <button id="copy-token-btn" class="btn btn-outline-secondary">Copy</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <input type="number" class="form-control" placeholder="Max Players" name="maxPlayers" min="2" max="10" value="5">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Demo User</h5>
                     </div>
-                    <button type="submit" class="btn btn-primary">Create Lobby</button>
-                </form>
-
-                <h3>Join Lobby</h3>
-                <form id="joinLobbyForm" class="mb-4">
-                    <div class="mb-3">
-                        <input type="text" class="form-control" placeholder="Lobby Code" name="code" required>
+                    <div class="card-body">
+                        <p>Need access to premium features?</p>
+                        <a href="demo-user.html" class="btn btn-primary">Get Demo User Access</a>
                     </div>
-                    <button type="submit" class="btn btn-primary">Join Lobby</button>
-                </form>
-
-                <button id="getLobbies" class="btn btn-info mb-3">Get Public Lobbies</button>
+                </div>
             </div>
         </div>
 
-        <!-- Subscription Section -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Subscription</h2>
-            </div>
-            <div class="card-body">
-                <button id="createCheckout" class="btn btn-primary mb-3">Subscribe to Premium</button>
-                <button id="getSubscription" class="btn btn-info mb-3">Get Subscription Details</button>
-                <button id="cancelSubscription" class="btn btn-danger mb-3">Cancel Subscription</button>
-            </div>
-        </div>
+        <ul class="nav nav-tabs" id="apiTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab" aria-controls="auth" aria-selected="true">Auth</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="quiz-tab" data-bs-toggle="tab" data-bs-target="#quiz" type="button" role="tab" aria-controls="quiz" aria-selected="false">Quiz</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="study-tab" data-bs-toggle="tab" data-bs-target="#study" type="button" role="tab" aria-controls="study" aria-selected="false">Study Materials</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="game-tab" data-bs-toggle="tab" data-bs-target="#game" type="button" role="tab" aria-controls="game" aria-selected="false">Game</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a href="subscription-tester.html" class="nav-link" id="subscription-tab">Mock Subscription Tester</a>
+            </li>
+        </ul>
 
-        <!-- Response Display -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Response</h2>
+        <div class="tab-content" id="apiTabContent">
+            <!-- Auth Tab -->
+            <div class="tab-pane fade show active" id="auth" role="tabpanel" aria-labelledby="auth-tab">
+                <div class="row">
+                    <!-- Login Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Login</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="login-form">
+                                    <div class="form-group">
+                                        <label for="login-email">Email:</label>
+                                        <input type="email" class="form-control" id="login-email" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="login-password">Password:</label>
+                                        <input type="password" class="form-control" id="login-password" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Login</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="login-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Register Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Register</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="register-form">
+                                    <div class="form-group">
+                                        <label for="register-name">Name:</label>
+                                        <input type="text" class="form-control" id="register-name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="register-email">Email:</label>
+                                        <input type="email" class="form-control" id="register-email" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="register-password">Password:</label>
+                                        <input type="password" class="form-control" id="register-password" required>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="is-student">
+                                        <label class="form-check-label" for="is-student">Register as Student (Education Tier)</label>
+                                    </div>
+                                    <div id="student-fields" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="student-email">Student Email (.edu):</label>
+                                            <input type="email" class="form-control" id="student-email" placeholder="your.name@university.edu">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="year-of-study">Year of Study:</label>
+                                            <select class="form-control" id="year-of-study">
+                                                <option value="1">1st Year</option>
+                                                <option value="2">2nd Year</option>
+                                                <option value="3">3rd Year</option>
+                                                <option value="4">4th Year</option>
+                                                <option value="5">5th Year</option>
+                                                <option value="6">6th Year</option>
+                                                <option value="7">7th Year</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-success">Register</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="register-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <pre id="response" class="response bg-light p-3"></pre>
+
+            <!-- Quiz Tab -->
+            <div class="tab-pane fade" id="quiz" role="tabpanel" aria-labelledby="quiz-tab">
+                <div class="auth-warning alert alert-danger">
+                    You need to be authenticated to use these endpoints. Please login first.
+                </div>
+                
+                <div class="row">
+                    <!-- Get Daily Questions Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Get Daily Questions</h5>
+                            </div>
+                            <div class="card-body">
+                                <button id="get-daily-questions-btn" class="btn btn-primary">Fetch Questions</button>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="daily-questions-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Leaderboard Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Daily Leaderboard</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <button id="get-leaderboard-btn" class="btn btn-primary">Fetch Leaderboard</button>
+                                </div>
+                                <div id="leaderboard-container" class="d-none">
+                                    <div class="alert alert-info">
+                                        <strong>Perfect score = All 10/10 questions correct</strong><br>
+                                        <strong>🏆 First place gets a FREE month of Premium membership!</strong>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Rank</th>
+                                                    <th>Player</th>
+                                                    <th>Score</th>
+                                                    <th>Correct</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="leaderboard-body">
+                                                <!-- Leaderboard entries will be inserted here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div id="user-rank-container" class="mt-3 alert alert-primary d-none">
+                                        Your rank: <span id="user-rank">--</span> • 
+                                        Score: <span id="user-score">0</span> points •
+                                        Correct: <span id="user-correct">0</span>/10
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="leaderboard-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Submit Answer Endpoint -->
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Submit Answer</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="submit-answer-form">
+                                    <div class="form-group">
+                                        <label for="question-id">Question ID:</label>
+                                        <input type="text" class="form-control" id="question-id" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="answer-text">Your Answer:</label>
+                                        <input type="text" class="form-control" id="answer-text" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="time-spent">Time Spent (seconds):</label>
+                                        <input type="number" min="1" max="120" class="form-control" id="time-spent" value="25">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Submit Answer</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="submit-answer-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Live Quiz Experience Demo -->
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Live Quiz Experience</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="quiz-container" class="d-none">
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h5 id="question-text">Question text goes here</h5>
+                                            <div>
+                                                <span class="badge bg-warning p-2">Time: <span id="countdown-timer">30</span>s</span>
+                                                <span class="badge bg-info p-2 ms-2">Points: <span id="possible-points">200</span></span>
+                                            </div>
+                                        </div>
+                                        <div class="text-muted small">
+                                            Category: <span id="question-category">Category</span> | 
+                                            Difficulty: <span id="question-difficulty">Medium</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group mb-3">
+                                        <input type="text" class="form-control form-control-lg" id="user-answer" placeholder="Type your answer here">
+                                    </div>
+                                    
+                                    <button id="submit-quiz-answer" class="btn btn-primary">Submit Answer</button>
+                                    
+                                    <div id="answer-feedback" class="mt-3 d-none">
+                                        <div id="feedback-correct" class="alert alert-success d-none">
+                                            <strong>Correct!</strong> <span id="correct-answer-text"></span>
+                                        </div>
+                                        <div id="feedback-incorrect" class="alert alert-danger d-none">
+                                            <strong>Incorrect!</strong> The correct answer is: <span id="correct-answer"></span>
+                                        </div>
+                                        <div id="feedback-timeout" class="alert alert-warning d-none">
+                                            <strong>Time's up!</strong> You didn't answer in time. The correct answer is: <span id="timeout-correct-answer"></span>
+                                        </div>
+                                        <div id="explanation-container" class="mt-2">
+                                            <strong>Explanation:</strong>
+                                            <p id="explanation-text"></p>
+                                        </div>
+                                        <button id="next-question" class="btn btn-secondary">Next Question</button>
+                                    </div>
+                                </div>
+                                
+                                <div id="quiz-start-container">
+                                    <p>Click the button below to start a demo quiz with the new typed answer format and countdown timer.</p>
+                                    <button id="start-quiz-demo" class="btn btn-success">Start Quiz Demo</button>
+                                </div>
+                                
+                                <div id="quiz-results" class="mt-3 d-none">
+                                    <h4>Quiz Results</h4>
+                                    <div class="alert alert-info">
+                                        <p>You got <span id="correct-count">0</span> out of <span id="total-count">0</span> questions correct.</p>
+                                    </div>
+                                    <button id="restart-quiz" class="btn btn-primary">Restart Quiz</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Study Materials Tab -->
+            <div class="tab-pane fade" id="study" role="tabpanel" aria-labelledby="study-tab">
+                <div class="auth-warning alert alert-danger">
+                    You need to be authenticated to use these endpoints. Please login first.
+                </div>
+                
+                <div class="row">
+                    <!-- Upload Study Material Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Upload Study Material</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="upload-study-form" enctype="multipart/form-data">
+                                    <div class="form-group">
+                                        <label for="study-file">Study Material (TXT, PDF, JPG, PNG):</label>
+                                        <input type="file" class="form-control" id="study-file" name="studyMaterial" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="study-title">Title:</label>
+                                        <input type="text" class="form-control" id="study-title" name="title">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="study-tags">Tags (comma separated):</label>
+                                        <input type="text" class="form-control" id="study-tags" name="tags" placeholder="math, calculus, equations">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Upload Material</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="upload-study-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Get Study Materials Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Get Study Materials</h5>
+                            </div>
+                            <div class="card-body">
+                                <button id="get-materials-btn" class="btn btn-primary">Fetch Materials</button>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="materials-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <!-- Generate Questions Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Generate Questions</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="generate-questions-form">
+                                    <div class="form-group">
+                                        <label for="material-id">Study Material ID:</label>
+                                        <input type="text" class="form-control" id="material-id" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="question-count">Number of Questions:</label>
+                                        <input type="number" min="1" max="10" class="form-control" id="question-count" value="5">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Generate Questions</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="generate-questions-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Custom Question Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Add Custom Question</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="custom-question-form">
+                                    <div class="form-group">
+                                        <label for="custom-material-id">Study Material ID:</label>
+                                        <input type="text" class="form-control" id="custom-material-id" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="question-text">Question Text:</label>
+                                        <input type="text" class="form-control" id="question-text" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="correct-answer">Correct Answer:</label>
+                                        <input type="text" class="form-control" id="correct-answer" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="alternative-answers">Alternative Answers (comma separated):</label>
+                                        <input type="text" class="form-control" id="alternative-answers" placeholder="alternative1, alternative2">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="explanation">Explanation (optional):</label>
+                                        <textarea class="form-control" id="explanation" rows="2"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="difficulty">Difficulty:</label>
+                                        <select class="form-control" id="difficulty">
+                                            <option value="easy">Easy</option>
+                                            <option value="medium" selected>Medium</option>
+                                            <option value="hard">Hard</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="time-limit">Time Limit (seconds):</label>
+                                        <input type="number" min="10" max="120" step="5" class="form-control" id="time-limit" value="30">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Add Question</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="custom-question-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Tab -->
+            <div class="tab-pane fade" id="game" role="tabpanel" aria-labelledby="game-tab">
+                <div class="auth-warning alert alert-danger">
+                    You need to be authenticated to use these endpoints. Please login first.
+                </div>
+                
+                <div class="row">
+                    <!-- Get Game Lobbies Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Get Game Lobbies</h5>
+                            </div>
+                            <div class="card-body">
+                                <button id="get-lobbies-btn" class="btn btn-primary">Fetch Lobbies</button>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="lobbies-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Create Lobby Endpoint -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Create Lobby</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="create-lobby-form">
+                                    <div class="form-group">
+                                        <label for="lobby-name">Lobby Name:</label>
+                                        <input type="text" class="form-control" id="lobby-name" required>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="is-public" checked>
+                                        <label class="form-check-label" for="is-public">Public Lobby</label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="max-players">Max Players:</label>
+                                        <input type="number" min="2" max="10" class="form-control" id="max-players" value="5">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Create Lobby</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="create-lobby-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Join Lobby Section -->
+                <div class="row mt-4">
+                    <!-- Join Public Lobby Section -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Join Public Lobby</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="public-lobbies-container" class="mb-3">
+                                    <p>Available public lobbies:</p>
+                                    <div class="alert alert-info">Fetch lobbies first to see available options</div>
+                                    <div id="public-lobbies-list" class="list-group mb-3" style="max-height: 200px; overflow-y: auto;"></div>
+                                </div>
+                                <button id="refresh-lobbies-btn" class="btn btn-outline-primary mb-3">Refresh Lobby List</button>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="join-public-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Join Private Lobby Section -->
+                    <div class="col-md-6">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Join Private Lobby</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="join-private-form">
+                                    <div class="form-group">
+                                        <label for="lobby-code">Lobby Code:</label>
+                                        <input type="text" class="form-control" id="lobby-code" placeholder="Enter 6-character code" required>
+                                        <small class="form-text text-muted">Enter the 6-character code provided by the lobby host</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary mt-2">Join Private Lobby</button>
+                                </form>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="join-private-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Lobby Section -->
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="card endpoint-card">
+                            <div class="card-header">
+                                <h5>Active Lobby</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="no-active-lobby" class="alert alert-info">
+                                    You're not currently in a lobby. Join or create one to get started.
+                                </div>
+                                <div id="active-lobby-details" class="d-none">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h5 id="active-lobby-name">Lobby Name</h5>
+                                            <div class="mb-2">
+                                                <strong>Code:</strong> <span id="active-lobby-code">ABCDEF</span>
+                                                <button id="copy-lobby-code-btn" class="btn btn-sm btn-outline-secondary ms-2">Copy</button>
+                                            </div>
+                                            <div class="mb-2">
+                                                <strong>Status:</strong> <span id="active-lobby-status">Waiting</span>
+                                            </div>
+                                            <div class="mb-2">
+                                                <strong>Host:</strong> <span id="active-lobby-host">Username</span>
+                                            </div>
+                                            <div class="mb-3">
+                                                <strong>Visibility:</strong> <span id="active-lobby-visibility">Public</span>
+                                            </div>
+                                            <div class="mb-3">
+                                                <button id="leave-lobby-btn" class="btn btn-danger">Leave Lobby</button>
+                                                <button id="start-game-btn" class="btn btn-success ms-2 d-none">Start Game</button>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h5>Players (<span id="player-count">0</span>/<span id="max-player-count">5</span>)</h5>
+                                            <ul id="player-list" class="list-group"></ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <strong>Response:</strong>
+                                    <pre id="active-lobby-response" class="response mt-2">No response yet</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script>
-        let token = localStorage.getItem('token');
-        let currentQuestion = null;
-        let socket = null;
-
-        // Helper function to make API calls
-        async function apiCall(endpoint, method = 'GET', body = null) {
-            try {
-                const headers = {
-                    'Content-Type': 'application/json'
-                };
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-
-                const options = {
-                    method,
-                    headers
-                };
-
-                if (body) {
-                    options.body = JSON.stringify(body);
-                }
-
-                const response = await fetch(`/api${endpoint}`, options);
-                const data = await response.json();
-                
-                document.getElementById('response').textContent = JSON.stringify(data, null, 2);
-                return data;
-            } catch (error) {
-                document.getElementById('response').textContent = error.message;
-                throw error;
-            }
-        }
-
-        // Authentication
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = await apiCall('/auth/register', 'POST', Object.fromEntries(formData));
-            if (data.token) {
-                token = data.token;
-                localStorage.setItem('token', token);
-            }
-        });
-
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = await apiCall('/auth/login', 'POST', Object.fromEntries(formData));
-            if (data.token) {
-                token = data.token;
-                localStorage.setItem('token', token);
-            }
-        });
-
-        document.getElementById('getProfile').addEventListener('click', () => {
-            apiCall('/auth/profile');
-        });
-
-        // Daily Quiz
-        document.getElementById('getDailyQuiz').addEventListener('click', async () => {
-            const data = await apiCall('/quiz/daily');
-            if (data.success && data.questions.length > 0) {
-                currentQuestion = data.questions[0];
-                displayQuestion(currentQuestion);
-            }
-        });
-
-        function displayQuestion(question) {
-            const container = document.getElementById('quizContainer');
-            const questionDisplay = document.getElementById('questionDisplay');
-            const optionsContainer = document.getElementById('optionsContainer');
-
-            container.classList.remove('d-none');
-            questionDisplay.textContent = question.text;
-            
-            optionsContainer.innerHTML = '';
-            question.options.forEach((option, index) => {
-                const button = document.createElement('button');
-                button.className = 'btn btn-outline-primary m-2';
-                button.textContent = option;
-                button.dataset.index = index;
-                button.onclick = () => selectAnswer(index);
-                optionsContainer.appendChild(button);
-            });
-        }
-
-        let selectedAnswer = null;
-        function selectAnswer(index) {
-            selectedAnswer = index;
-            const buttons = document.querySelectorAll('#optionsContainer button');
-            buttons.forEach(button => button.classList.remove('active'));
-            buttons[index].classList.add('active');
-        }
-
-        document.getElementById('submitAnswer').addEventListener('click', async () => {
-            if (currentQuestion && selectedAnswer !== null) {
-                await apiCall('/quiz/daily/submit', 'POST', {
-                    questionId: currentQuestion.id,
-                    answer: selectedAnswer
-                });
-                selectedAnswer = null;
-            }
-        });
-
-        // Multiplayer
-        document.getElementById('createLobbyForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            await apiCall('/game/lobby', 'POST', {
-                name: formData.get('name'),
-                isPublic: formData.get('isPublic') === 'on',
-                maxPlayers: parseInt(formData.get('maxPlayers'))
-            });
-        });
-
-        document.getElementById('joinLobbyForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            await apiCall('/game/lobby/join', 'POST', {
-                code: formData.get('code')
-            });
-        });
-
-        document.getElementById('getLobbies').addEventListener('click', () => {
-            apiCall('/game/lobbies');
-        });
-
-        // Subscription
-        document.getElementById('createCheckout').addEventListener('click', async () => {
-            const data = await apiCall('/subscription/checkout', 'POST');
-            if (data.success && data.url) {
-                window.location.href = data.url;
-            }
-        });
-
-        document.getElementById('getSubscription').addEventListener('click', () => {
-            apiCall('/subscription/details');
-        });
-
-        document.getElementById('cancelSubscription').addEventListener('click', () => {
-            apiCall('/subscription/cancel', 'POST');
-        });
-
-        // Socket.IO Connection
-        function connectSocket() {
-            if (!token) return;
-
-            socket = io('http://localhost:3000', {
-                auth: {
-                    token
-                }
-            });
-
-            socket.on('connect', () => {
-                console.log('Socket connected');
-            });
-
-            socket.on('error', (error) => {
-                document.getElementById('response').textContent = `Socket Error: ${error.message}`;
-            });
-        }
-
-        // Initialize socket connection when token is available
-        if (token) {
-            connectSocket();
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/api-tester.js"></script>
 </body>
 </html>

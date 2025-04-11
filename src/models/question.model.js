@@ -6,16 +6,15 @@ const questionSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  options: [{
+  correctAnswer: {
     type: String,
     required: true,
     trim: true
-  }],
-  correctAnswer: {
-    type: Number,
-    required: true,
-    min: 0
   },
+  alternativeAnswers: [{
+    type: String,
+    trim: true
+  }],
   category: {
     type: String,
     required: true,
@@ -29,7 +28,21 @@ const questionSchema = new mongoose.Schema({
   explanation: {
     type: String,
     trim: true
-  }
+  },
+  timeLimit: {
+    type: Number,
+    default: 30,
+    min: 10,
+    max: 120
+  },
+  isMultipleChoice: {
+    type: Boolean,
+    default: false
+  },
+  options: [{
+    type: String,
+    trim: true
+  }]
 }, {
   timestamps: true
 });
