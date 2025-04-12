@@ -49,4 +49,24 @@ exports.sendVerificationSuccessEmail = async (email, name) => {
     console.error('Error sending verification success email:', error);
     return false;
   }
+};
+
+/**
+ * Sends a password reset OTP to the user
+ * @param {string} email - User's email address
+ * @param {string} otp - One-time password for reset
+ * @returns {Promise<boolean>} - Success status
+ */
+exports.sendPasswordResetOTP = async (email, otp) => {
+  try {
+    console.log(`MOCK EMAIL SERVICE: Sending password reset OTP to ${email}`);
+    console.log(`Subject: Password Reset OTP for Text the Answer`);
+    console.log(`Body: Your OTP for password reset is: ${otp}. It is valid for 15 minutes.`);
+    console.log(`Note: If you did not request this password reset, please ignore this email or contact support.`);
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending password reset OTP:', error);
+    return false;
+  }
 }; 

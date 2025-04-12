@@ -19,6 +19,7 @@ const subscriptionRoutes = require('./routes/subscription.routes');
 const subscriptionMockRoutes = require('./routes/subscription.mock.routes');
 const studyMaterialRoutes = require('./routes/studyMaterial.routes');
 const demoRoutes = require('./routes/demo.routes');
+const profileRoutes = require('./routes/profile.routes');
 
 // Initialize Express app
 const app = express();
@@ -48,6 +49,7 @@ require('./docs/game.swagger');
 require('./docs/leaderboard.swagger');
 require('./docs/subscription.swagger');
 require('./docs/studyMaterial.swagger');
+require('./docs/profile.swagger');
 
 // Swagger setup
 const swaggerDocument = YAML.load(path.join(__dirname, 'docs', 'swagger.yaml'));
@@ -79,6 +81,7 @@ app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/mock-subscription', subscriptionMockRoutes);
 app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Socket.IO setup
 // Initialize socket handlers
