@@ -16,6 +16,9 @@ const quizRoutes = require('./routes/quiz.routes');
 const gameRoutes = require('./routes/game.routes');
 const leaderboardRoutes = require('./routes/leaderboard.routes');
 const subscriptionRoutes = require('./routes/subscription.routes');
+const subscriptionMockRoutes = require('./routes/subscription.mock.routes');
+const studyMaterialRoutes = require('./routes/studyMaterial.routes');
+const demoRoutes = require('./routes/demo.routes');
 
 // Initialize Express app
 const app = express();
@@ -39,7 +42,12 @@ seedQuestions().catch(err => console.error('Error seeding database:', err));
 scheduleDailyTasks();
 
 // Import Swagger documentation
+require('./docs/auth.swagger');
+require('./docs/quiz.swagger');
+require('./docs/game.swagger');
 require('./docs/leaderboard.swagger');
+require('./docs/subscription.swagger');
+require('./docs/studyMaterial.swagger');
 
 // Swagger setup
 const swaggerDocument = YAML.load(path.join(__dirname, 'docs', 'swagger.yaml'));
@@ -51,7 +59,11 @@ app.use(morgan('dev'));
 app.use(express.static('src/public')); // Add this line to serve static files
 
 // Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "Text the Answer API Documentation"
+}));
 
 // Basic route
 app.get('/', (req, res) => {
@@ -64,6 +76,9 @@ app.use('/api/quiz', quizRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/mock-subscription', subscriptionMockRoutes);
+app.use('/api/study-materials', studyMaterialRoutes);
+app.use('/api/demo', demoRoutes);
 
 // Socket.IO setup
 // Initialize socket handlers
@@ -93,6 +108,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`API Documentation available at http://localhost:${PORT}/api-docs`);
 });
 
 module.exports = { app, server, io };

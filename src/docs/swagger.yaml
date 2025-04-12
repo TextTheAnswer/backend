@@ -1,12 +1,36 @@
 openapi: 3.0.0
 info:
   title: Text the Answer API
-  description: API documentation for Text the Answer trivia game
+  description: |
+    API documentation for Text the Answer trivia game
+
+    ## Overview
+    Text the Answer is a trivia application with daily quizzes and multiplayer functionality.
+    This API provides endpoints for authentication, quiz access, multiplayer games, and subscription management.
+
+    ## Authentication
+    Most endpoints require authentication via JWT token in the Authorization header.
+    To authenticate, first register or login to receive a token, then include it in subsequent requests:
+    ```
+    Authorization: Bearer YOUR_TOKEN_HERE
+    ```
+
+    ## Subscription Tiers
+    - **Free**: Limited to 10 questions per day
+    - **Premium**: Unlimited questions, multiplayer games, premium features
+    - **Education**: Student tier with verified .edu email, similar benefits to premium plus study material scanning
+  
   version: 1.0.0
+  contact:
+    name: Support Team
+    email: support@texttheanswer.com
+    url: https://texttheanswer.com/support
 
 servers:
-  - url: http://localhost:3000
+  - url: http://localhost:3000/api
     description: Local development server
+  - url: https://api.texttheanswer.com
+    description: Production server
 
 components:
   securitySchemes:
@@ -15,8 +39,21 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+security:
+  - bearerAuth: []
+
 tags:
+  - name: Authentication
+    description: User authentication and management endpoints
+  - name: Quiz
+    description: Daily quiz related endpoints
+  - name: Game
+    description: Multiplayer game endpoints
   - name: Leaderboard
     description: Leaderboard management endpoints
+  - name: Subscription
+    description: Subscription management endpoints
+  - name: Study Materials
+    description: Study material management (Education Tier)
 
 paths: {}

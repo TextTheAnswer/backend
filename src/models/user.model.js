@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
   subscription: {
     status: {
       type: String,
-      enum: ['free', 'premium'],
+      enum: ['free', 'premium', 'education'],
       default: 'free'
     },
     stripeCustomerId: String,
@@ -37,6 +37,27 @@ const userSchema = new mongoose.Schema({
     freeTrialUsed: {
       type: Boolean,
       default: false
+    }
+  },
+  education: {
+    isStudent: {
+      type: Boolean,
+      default: false
+    },
+    studentEmail: {
+      type: String,
+      trim: true,
+      lowercase: true
+    },
+    yearOfStudy: {
+      type: Number,
+      min: 1,
+      max: 7
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
+      default: 'pending'
     }
   },
   stats: {
@@ -61,6 +82,10 @@ const userSchema = new mongoose.Schema({
       default: 0
     },
     correctAnswers: {
+      type: Number,
+      default: 0
+    },
+    score: {
       type: Number,
       default: 0
     }
@@ -105,7 +130,15 @@ userSchema.methods.resetDailyQuiz = function() {
 
 // Method to check if user is premium
 userSchema.methods.isPremium = function() {
-  return this.subscription.status === 'premium' && 
+  return (this.subscription.status === 'premium' || this.subscription.status === 'education') && 
+         (!this.subscription.currentPeriodEnd || 
+          new Date(this.subscription.currentPeriodEnd) > new Date());
+};
+
+// Method to check if user is on education tier
+userSchema.methods.isEducation = function() {
+  return this.subscription.status === 'education' && 
+         this.education.verificationStatus === 'verified' &&
          (!this.subscription.currentPeriodEnd || 
           new Date(this.subscription.currentPeriodEnd) > new Date());
 };

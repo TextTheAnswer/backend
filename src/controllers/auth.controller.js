@@ -1,10 +1,11 @@
 const User = require('../models/user.model');
 const { generateToken } = require('../utils/jwt.utils');
+const emailService = require('../services/email.service');
 
 // Register a new user
 exports.register = async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, isStudent, studentEmail, yearOfStudy } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -15,28 +16,70 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create new user
+    // Create new user with basic info
     const user = new User({
       email,
       password,
       name
     });
 
+    // Handle education tier registration if applicable
+    if (isStudent) {
+      // Check if a valid student email is provided
+      if (!studentEmail || !studentEmail.endsWith('.edu')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid student email with .edu domain is required for education tier'
+        });
+      }
+
+      // Check if year of study is provided and valid
+      if (!yearOfStudy || yearOfStudy < 1 || yearOfStudy > 7) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid year of study (1-7) is required for education tier'
+        });
+      }
+
+      // Set education tier specific fields
+      user.subscription.status = 'education';
+      user.education = {
+        isStudent: true,
+        studentEmail,
+        yearOfStudy,
+        verificationStatus: 'pending' // Will require verification
+      };
+    }
+
     await user.save();
+
+    // Send verification email for student accounts
+    if (isStudent) {
+      await emailService.sendStudentVerificationEmail(
+        user.education.studentEmail,
+        user.name,
+        user._id
+      );
+    }
 
     // Generate JWT token
     const token = generateToken(user._id);
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: isStudent ? 'Student account registered successfully. Please check your student email for verification.' : 'User registered successfully',
       token,
       user: {
         id: user._id,
         email: user.email,
         name: user.name,
         subscription: user.subscription.status,
-        isPremium: user.isPremium()
+        isPremium: user.isPremium(),
+        education: isStudent ? {
+          status: 'pending',
+          studentEmail: user.education.studentEmail,
+          yearOfStudy: user.education.yearOfStudy
+        } : undefined
       }
     });
   } catch (error) {
@@ -126,7 +169,12 @@ exports.getProfile = async (req, res) => {
         subscription: user.subscription,
         stats: user.stats,
         dailyQuiz: user.dailyQuiz,
-        isPremium: user.isPremium()
+        isPremium: user.isPremium(),
+        education: user.education && user.education.isStudent ? {
+          status: user.education.verificationStatus,
+          studentEmail: user.education.studentEmail,
+          yearOfStudy: user.education.yearOfStudy
+        } : undefined
       }
     });
   } catch (error) {
@@ -201,4 +249,47 @@ exports.logout = (req, res) => {
     success: true,
     message: 'Logged out successfully'
   });
+};
+
+// Verify student email
+exports.verifyStudentEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    // In a real implementation, this would validate a verification token
+    // Here we're just simulating the verification process
+    
+    // Decode the token to get the user ID (this is simplified)
+    const userId = token.split('_')[0]; // Just an example of token format
+    
+    const user = await User.findById(userId);
+    if (!user || !user.education || !user.education.isStudent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification token'
+      });
+    }
+    
+    // Update verification status
+    user.education.verificationStatus = 'verified';
+    await user.save();
+    
+    // Send confirmation email
+    await emailService.sendVerificationSuccessEmail(
+      user.education.studentEmail,
+      user.name
+    );
+    
+    res.status(200).json({
+      success: true,
+      message: 'Student email verified successfully. You now have access to education tier benefits.'
+    });
+  } catch (error) {
+    console.error('Verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying student email',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 };

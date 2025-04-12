@@ -21,13 +21,23 @@ exports.getDailyQuestions = async (req, res) => {
     const dailyQuiz = await DailyQuiz.getTodayQuiz();
     
     // Return questions without correct answers
-    const questions = dailyQuiz.questions.map(q => ({
-      id: q._id,
-      text: q.text,
-      options: q.options,
-      category: q.category,
-      difficulty: q.difficulty
-    }));
+    const questions = dailyQuiz.questions.map(q => {
+      const questionData = {
+        id: q._id,
+        text: q.text,
+        category: q.category,
+        difficulty: q.difficulty,
+        timeLimit: q.timeLimit || 30
+      };
+
+      // For backward compatibility with old multiple choice questions
+      if (q.isMultipleChoice) {
+        questionData.isMultipleChoice = true;
+        questionData.options = q.options;
+      }
+      
+      return questionData;
+    });
     
     res.status(200).json({
       success: true,
@@ -48,7 +58,7 @@ exports.getDailyQuestions = async (req, res) => {
 // Submit answer for daily quiz
 exports.submitAnswer = async (req, res) => {
   try {
-    const { questionId, answer } = req.body;
+    const { questionId, answer, timeSpent } = req.body;
     const user = req.user;
     
     // Check if user has already completed today's quiz (free tier limitation)
@@ -69,13 +79,61 @@ exports.submitAnswer = async (req, res) => {
     }
     
     // Check if answer is correct
-    const isCorrect = question.correctAnswer === answer;
+    let isCorrect = false;
+    
+    if (question.isMultipleChoice) {
+      // For legacy multiple choice questions
+      isCorrect = parseInt(answer) === question.correctAnswer;
+    } else {
+      // For new free-text questions - perform case-insensitive match
+      const userAnswer = answer.trim().toLowerCase();
+      const correctAnswer = question.correctAnswer.toLowerCase();
+      const alternatives = question.alternativeAnswers.map(alt => alt.toLowerCase());
+      
+      isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
+    }
+    
+    // Check if the answer was submitted within the time limit
+    const timeLimit = question.timeLimit || 30;
+    const withinTimeLimit = !timeSpent || timeSpent <= timeLimit;
+    
+    // If answer was submitted after time limit, mark it as incorrect
+    if (!withinTimeLimit) {
+      isCorrect = false;
+    }
+    
+    // Calculate points based on time spent (faster answers get more points)
+    // Only if answer is correct and within time limit
+    let points = 0;
+    if (isCorrect && withinTimeLimit) {
+      // Base points for correct answer
+      const basePoints = 100;
+      
+      // Time bonus: faster answers get more points
+      // Formula: Bonus = (1 - timeSpent/timeLimit) * 100
+      // This gives a range of 0-100 bonus points
+      const timeBonus = Math.round((1 - (timeSpent / timeLimit)) * 100);
+      
+      // Difficulty multiplier
+      const difficultyMultiplier = 
+        question.difficulty === 'easy' ? 1 :
+        question.difficulty === 'medium' ? 1.5 : 2; // hard = 2x
+      
+      // Calculate total points
+      points = Math.round((basePoints + timeBonus) * difficultyMultiplier);
+    }
     
     // Update user's daily quiz stats
     user.dailyQuiz.questionsAnswered += 1;
     if (isCorrect) {
       user.dailyQuiz.correctAnswers += 1;
       user.stats.totalCorrect += 1;
+      
+      // Add points to the user's score for the day
+      if (!user.dailyQuiz.score) {
+        user.dailyQuiz.score = 0;
+      }
+      user.dailyQuiz.score += points;
     }
     user.stats.totalAnswered += 1;
     
@@ -98,21 +156,33 @@ exports.submitAnswer = async (req, res) => {
     
     // Update daily quiz leaderboard if needed
     const dailyQuiz = await DailyQuiz.getTodayQuiz();
-    if (user.dailyQuiz.correctAnswers > dailyQuiz.highestScore && user.dailyQuiz.questionsAnswered === 10) {
-      dailyQuiz.highestScore = user.dailyQuiz.correctAnswers;
+    // If user got all 10 questions correct and has a higher score than current leader
+    if (user.dailyQuiz.correctAnswers === 10 && 
+        (user.dailyQuiz.score > dailyQuiz.highestScore || !dailyQuiz.winner)) {
+      dailyQuiz.highestScore = user.dailyQuiz.score;
       dailyQuiz.winner = user._id;
       await dailyQuiz.save();
     }
     
-    res.status(200).json({
+    const responseData = {
       success: true,
       isCorrect,
+      points,
       correctAnswer: question.correctAnswer,
       explanation: question.explanation,
       questionsAnswered: user.dailyQuiz.questionsAnswered,
       correctAnswers: user.dailyQuiz.correctAnswers,
-      streak: user.stats.streak
-    });
+      totalScore: user.dailyQuiz.score || 0,
+      streak: user.stats.streak,
+      withinTimeLimit
+    };
+    
+    // For backward compatibility with old multiple choice questions
+    if (question.isMultipleChoice) {
+      responseData.correctAnswerIndex = question.correctAnswer;
+    }
+    
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('Submit answer error:', error);
     res.status(500).json({
@@ -129,34 +199,39 @@ exports.getDailyLeaderboard = async (req, res) => {
     // Get today's quiz
     const dailyQuiz = await DailyQuiz.getTodayQuiz();
     
-    // Get top 10 users for today's quiz
+    // Get top 10 users for today's quiz - sort by score (speed) rather than just correct answers
     const topUsers = await User.find({
       'dailyQuiz.questionsAnswered': { $gt: 0 }
     })
-    .sort({ 'dailyQuiz.correctAnswers': -1, 'dailyQuiz.questionsAnswered': 1 })
+    .sort({ 'dailyQuiz.score': -1, 'dailyQuiz.correctAnswers': -1 })
     .limit(10)
-    .select('name dailyQuiz.correctAnswers');
+    .select('name dailyQuiz.correctAnswers dailyQuiz.score');
     
     // Format leaderboard data
     const leaderboard = topUsers.map((user, index) => ({
       rank: index + 1,
       name: user.name,
-      score: user.dailyQuiz.correctAnswers
+      correctAnswers: user.dailyQuiz.correctAnswers,
+      score: user.dailyQuiz.score || 0, // Include score in leaderboard
+      isPerfectScore: user.dailyQuiz.correctAnswers === 10 // Show if user got all questions correct
     }));
     
     // Get user's rank if not in top 10
     let userRank = null;
+    let userScore = null;
     if (req.user) {
       const userPosition = await User.countDocuments({
-        'dailyQuiz.correctAnswers': { $gt: req.user.dailyQuiz.correctAnswers }
+        'dailyQuiz.score': { $gt: (req.user.dailyQuiz.score || 0) }
       });
       userRank = userPosition + 1;
+      userScore = req.user.dailyQuiz.score || 0;
     }
     
     res.status(200).json({
       success: true,
       leaderboard,
       userRank,
+      userScore,
       winner: dailyQuiz.winner ? {
         id: dailyQuiz.winner,
         score: dailyQuiz.highestScore

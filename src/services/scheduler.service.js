@@ -46,27 +46,34 @@ async function determineDailyQuizWinner() {
       return;
     }
     
-    // Find user with highest score
+    // Find user with highest score (must have all 10 questions correct)
     const topUser = await User.findOne({
       'dailyQuiz.questionsAnswered': 10,
-      'dailyQuiz.correctAnswers': { $gt: 0 }
-    }).sort({ 'dailyQuiz.correctAnswers': -1, 'dailyQuiz.lastCompleted': 1 }).limit(1);
+      'dailyQuiz.correctAnswers': 10
+    }).sort({ 'dailyQuiz.score': -1 }).limit(1);
     
     if (!topUser) {
-      console.log('No eligible winner found for yesterday\'s daily quiz');
+      console.log('No eligible winner found for yesterday\'s daily quiz (no perfect scores)');
       return;
     }
     
     // Update daily quiz with winner
     dailyQuiz.winner = topUser._id;
-    dailyQuiz.highestScore = topUser.dailyQuiz.correctAnswers;
+    dailyQuiz.highestScore = topUser.dailyQuiz.score || 0;
     dailyQuiz.active = false;
     await dailyQuiz.save();
     
     // Award free premium month to winner
-    await awardFreePremium(topUser);
+    const awarded = await awardFreePremium(topUser);
     
-    console.log(`Daily quiz winner determined: ${topUser._id} with score ${topUser.dailyQuiz.correctAnswers}`);
+    if (awarded) {
+      console.log(`Daily quiz winner ${topUser._id} awarded 1 month free premium subscription! Score: ${topUser.dailyQuiz.score}`);
+      
+      // Reset all users' daily quiz stats
+      await resetDailyQuizStats();
+    } else {
+      console.log(`Failed to award premium to user ${topUser._id}`);
+    }
   } catch (error) {
     console.error('Error determining daily quiz winner:', error);
     throw error;
