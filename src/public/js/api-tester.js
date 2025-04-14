@@ -139,6 +139,44 @@ document.getElementById('start-game-btn').addEventListener('click', function() {
     startGame();
 });
 
+// Profile form handlers
+document.getElementById('create-profile-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    createProfile();
+});
+
+document.getElementById('get-profile-btn').addEventListener('click', function() {
+    getProfile();
+});
+
+// Profile picture handlers
+document.querySelectorAll('input[name="profile-pic-option"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const customContainer = document.getElementById('custom-pic-container');
+        if (this.value === 'custom') {
+            customContainer.classList.remove('d-none');
+        } else {
+            customContainer.classList.add('d-none');
+        }
+    });
+});
+
+document.getElementById('profile-pic-upload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        const previewContainer = document.getElementById('image-preview-container');
+        const previewImage = document.getElementById('image-preview');
+        
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            previewContainer.style.display = 'block';
+        }
+        
+        reader.readAsDataURL(file);
+    }
+});
+
 // Button click handlers for quiz demo
 startQuizBtn.addEventListener('click', startQuizDemo);
 submitQuizAnswerBtn.addEventListener('click', submitQuizAnswer);
@@ -782,13 +820,12 @@ function leaveLobby() {
 function copyLobbyCode() {
     if (!currentLobby) return;
     
-    const codeText = currentLobby.code;
-    navigator.clipboard.writeText(codeText)
+    navigator.clipboard.writeText(currentLobby.code)
         .then(() => {
-            alert('Lobby code copied to clipboard!');
+            alert('Lobby code copied to clipboard');
         })
         .catch(err => {
-            console.error('Failed to copy: ', err);
+            console.error('Error copying text: ', err);
         });
 }
 
@@ -1177,4 +1214,128 @@ function displayLeaderboard(data) {
     } else {
         userRankContainer.classList.add('d-none');
     }
+}
+
+// Profile Functions
+function createProfile() {
+    if (!isAuthenticated) {
+        alert('You need to log in first');
+        return;
+    }
+    
+    const bio = document.getElementById('profile-bio').value;
+    const location = document.getElementById('profile-location').value;
+    
+    // Get favorite categories
+    const favoriteCategories = [];
+    if (document.getElementById('category-science').checked) favoriteCategories.push('Science');
+    if (document.getElementById('category-history').checked) favoriteCategories.push('History');
+    if (document.getElementById('category-sports').checked) favoriteCategories.push('Sports');
+    if (document.getElementById('category-entertainment').checked) favoriteCategories.push('Entertainment');
+    
+    // Get notification settings
+    const notificationSettings = {
+        dailyQuizReminder: document.getElementById('notify-daily-quiz').checked,
+        multiplayerInvites: document.getElementById('notify-multiplayer').checked
+    };
+    
+    // Get display theme
+    const displayTheme = document.getElementById('display-theme').value;
+    
+    // Handle profile picture
+    let profilePicture = null;
+    const selectedOption = document.querySelector('input[name="profile-pic-option"]:checked').value;
+    
+    if (selectedOption === 'default-1' || selectedOption === 'default-2') {
+        // Use default image
+        profilePicture = selectedOption;
+    } else if (selectedOption === 'custom') {
+        // Use custom uploaded image
+        const fileInput = document.getElementById('profile-pic-upload');
+        if (fileInput.files && fileInput.files[0]) {
+            // Convert image to base64
+            const imagePreview = document.getElementById('image-preview');
+            if (imagePreview.src) {
+                profilePicture = imagePreview.src; // base64 data URL
+            }
+        }
+    }
+    
+    const requestData = {
+        bio,
+        location,
+        preferences: {
+            favoriteCategories,
+            notificationSettings,
+            displayTheme
+        }
+    };
+    
+    // Add profile picture if selected
+    if (profilePicture) {
+        requestData.profilePicture = profilePicture;
+    }
+    
+    const responseElement = document.getElementById('create-profile-response');
+    responseElement.textContent = 'Sending request...';
+    
+    fetch(`${API_BASE_URL}/profile/create`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        responseElement.textContent = JSON.stringify(data, null, 2);
+        
+        // If profile was created successfully with an image, show it
+        if (data.success && data.profile && data.profile.imageUrl) {
+            alert('Profile created successfully with profile picture!');
+        }
+    })
+    .catch(error => {
+        responseElement.textContent = `Error: ${error.message}`;
+    });
+}
+
+function getProfile() {
+    if (!isAuthenticated) {
+        alert('You need to log in first');
+        return;
+    }
+    
+    const responseElement = document.getElementById('get-profile-response');
+    responseElement.textContent = 'Fetching profile...';
+    
+    fetch(`${API_BASE_URL}/profile/full`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${authToken}`
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        responseElement.textContent = JSON.stringify(data, null, 2);
+        
+        // If profile has an image URL, display it
+        if (data.success && data.profile && data.profile.profile && data.profile.profile.imageUrl) {
+            const previewContainer = document.getElementById('get-profile-image-preview');
+            if (previewContainer) {
+                const imageUrl = data.profile.profile.imageUrl;
+                previewContainer.innerHTML = `
+                    <div class="mt-3 text-center">
+                        <img src="${imageUrl}" alt="Profile Image" style="max-width: 150px; max-height: 150px; border-radius: 50%; border: 3px solid #0d6efd;">
+                        <div class="mt-2">Current Profile Image</div>
+                    </div>
+                `;
+                previewContainer.style.display = 'block';
+            }
+        }
+    })
+    .catch(error => {
+        responseElement.textContent = `Error: ${error.message}`;
+    });
 } 

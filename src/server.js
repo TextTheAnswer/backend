@@ -32,15 +32,25 @@ const io = socketIo(server, {
 });
 
 // Connect to MongoDB
-connectDB();
+connectDB()
+  .then(() => {
+    console.log('Database connection established successfully');
+    
+    // Initialize database with seed data after connection is established
+    seedQuestions()
+      .then(() => console.log('Database seeding completed'))
+      .catch(err => console.error('Error seeding database:', err));
+      
+    // Schedule daily tasks after connection is established
+    scheduleDailyTasks();
+  })
+  .catch(err => {
+    console.error('Failed to connect to the database. Server will continue without seeding:', err);
+  });
 
 // Import utilities and services
 const { seedQuestions } = require('./utils/database.utils');
 const { scheduleDailyTasks } = require('./services/scheduler.service');
-
-// Initialize services
-seedQuestions().catch(err => console.error('Error seeding database:', err));
-scheduleDailyTasks();
 
 // Import Swagger documentation
 require('./docs/auth.swagger');
@@ -54,6 +64,14 @@ require('./docs/profile.swagger');
 // Swagger setup
 const swaggerDocument = YAML.load(path.join(__dirname, 'docs', 'swagger.yaml'));
 
+// Dynamically load Swagger documentation from modules
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerOptions = {
+  definition: swaggerDocument,
+  apis: ['./src/docs/*.swagger.js'],
+};
+const swaggerSpec = swaggerJsDoc(swaggerOptions);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -61,16 +79,57 @@ app.use(morgan('dev'));
 app.use(express.static('src/public')); // Add this line to serve static files
 
 // Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   explorer: true,
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "Text the Answer API Documentation"
+  customSiteTitle: "Text the Answer API Documentation",
+  swaggerOptions: {
+    persistAuthorization: false,
+    displayRequestDuration: true,
+    docExpansion: 'none',
+    filter: true,
+    supportedSubmitMethods: ['get', 'post', 'put', 'delete'],
+    tagsSorter: 'alpha'
+  }
 }));
 
 // Basic route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Text the Answer API' });
 });
+
+// Test email route (only in development)
+if (process.env.NODE_ENV === 'development') {
+  app.get('/api/test-email', async (req, res) => {
+    try {
+      const emailService = require('./services/email.service');
+      const result = await emailService.sendPasswordResetOTP(
+        process.env.EMAIL_USER, // Send to self for testing
+        '123456' // Test OTP
+      );
+      
+      if (result) {
+        res.json({ 
+          success: true, 
+          message: 'Test email sent successfully! Check your email inbox.',
+          emailSentTo: process.env.EMAIL_USER 
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: 'Failed to send test email. Check server logs for details.'
+        });
+      }
+    } catch (error) {
+      console.error('Error in test email route:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error sending test email', 
+        error: error.message 
+      });
+    }
+  });
+}
 
 // Routes
 app.use('/api/auth', authRoutes);

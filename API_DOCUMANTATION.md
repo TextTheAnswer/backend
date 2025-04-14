@@ -560,7 +560,9 @@
 - **Request body**:
   ```json
   {
-    "name": "New User Name"
+    "name": "New User Name",
+    "bio": "A short bio about me",
+    "location": "New York, USA"
   }
   ```
 - **Success Response**: 
@@ -574,6 +576,11 @@
         "id": "user_id",
         "email": "user@example.com",
         "name": "New User Name",
+        "profile": {
+          "bio": "A short bio about me",
+          "location": "New York, USA",
+          "imageUrl": "https://res.cloudinary.com/example/image/upload/profile.jpg"
+        },
         "subscription": "premium",
         "stats": {
           "streak": 5,
@@ -582,6 +589,40 @@
         },
         "isPremium": true
       }
+    }
+    ```
+
+### Upload profile image
+- **URL**: `/profile/image`
+- **Method**: `POST`
+- **Auth required**: Yes (JWT token in Authorization header)
+- **Content-Type**: `multipart/form-data`
+- **Request parameters**:
+  - `image`: Image file (JPG, PNG, etc.)
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "Profile image uploaded successfully",
+      "profile": {
+        "imageUrl": "https://res.cloudinary.com/example/image/upload/profile.jpg"
+      }
+    }
+    ```
+
+### Delete profile image
+- **URL**: `/profile/image`
+- **Method**: `DELETE`
+- **Auth required**: Yes (JWT token in Authorization header)
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "Profile image deleted successfully"
     }
     ```
 
@@ -599,6 +640,11 @@
         "id": "user_id",
         "email": "user@example.com",
         "name": "User Name",
+        "profile": {
+          "bio": "A short bio about me",
+          "location": "New York, USA",
+          "imageUrl": "https://res.cloudinary.com/example/image/upload/profile.jpg"
+        },
         "subscription": {
           "status": "premium",
           "currentPeriodEnd": "2023-05-01T00:00:00.000Z",
@@ -764,3 +810,11 @@
   - Payload: `{ gameId, leaderboard, userRank }`
 - `error`: Error message
   - Payload: `{ message }`
+
+## Public Endpoints
+
+The following endpoints do not require authentication:
+
+- `/auth/register` and `/auth/login` - User registration and login
+- `/leaderboard/daily` - Public daily leaderboard
+- Various other public endpoints marked as "Auth required: No"
