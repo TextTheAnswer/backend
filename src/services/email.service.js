@@ -1,32 +1,29 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Log email configuration (without sensitive info)
-console.log('Email Configuration:');
-console.log(`- Host: ${process.env.EMAIL_HOST || 'smtp.gmail.com'}`);
-console.log(`- Port: ${process.env.EMAIL_PORT || 587}`);
-console.log(`- Secure: ${process.env.EMAIL_SECURE === 'true'}`);
-console.log(`- User: ${process.env.EMAIL_USER}`);
+// Simple configuration log
+console.log('Email Service: Initializing with', process.env.EMAIL_USER);
 
 // Create a transporter using SMTP
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 587,
+  port: parseInt(process.env.EMAIL_PORT) || 465,
   secure: process.env.EMAIL_SECURE === 'true',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_APP_PASSWORD,
   },
-  debug: process.env.NODE_ENV === 'development', // Enable debugging in development
-  logger: process.env.NODE_ENV === 'development', // Enable logging in development
+  // Disable verbose logging
+  debug: false,
+  logger: false
 });
 
 // Verify the connection configuration
 transporter.verify(function(error, success) {
   if (error) {
-    console.error('Email service connection error:', error);
+    console.error('Email Service: Connection failed -', error.message);
   } else {
-    console.log('Email service is ready to send messages');
+    console.log('Email Service: Ready to send messages');
   }
 });
 
@@ -42,22 +39,16 @@ const sendEmail = async (mailOptions) => {
       mailOptions.from = `Text the Answer <${process.env.EMAIL_USER}>`;
     }
 
-    console.log(`Sending email to: ${mailOptions.to}`);
-    console.log(`Subject: ${mailOptions.subject}`);
+    // Simplified logging
+    console.log(`Email Service: Sending to ${mailOptions.to} - Subject: ${mailOptions.subject}`);
     
     // Send email
     const info = await transporter.sendMail(mailOptions);
-    console.log(`Email sent: ${info.messageId}`);
-    
-    // Only log preview URL when using Ethereal email service
-    if (info.messageId && process.env.EMAIL_HOST === 'smtp.ethereal.email') {
-      console.log(`Email preview URL: ${nodemailer.getTestMessageUrl(info)}`);
-    }
+    console.log(`Email Service: Sent successfully [${info.messageId.substring(0, 8)}...]`);
     
     return true;
   } catch (error) {
-    console.error('Error sending email:', error);
-    console.error('Error details:', JSON.stringify(error));
+    console.error('Email Service: Send failed -', error.message);
     return false;
   }
 };
@@ -101,7 +92,7 @@ exports.sendStudentVerificationEmail = async (email, name, userId) => {
     
     return await sendEmail(mailOptions);
   } catch (error) {
-    console.error('Error sending student verification email:', error);
+    console.error('Email Service: Student verification email failed -', error.message);
     return false;
   }
 };
@@ -137,7 +128,7 @@ exports.sendVerificationSuccessEmail = async (email, name) => {
 
     return await sendEmail(mailOptions);
   } catch (error) {
-    console.error('Error sending verification success email:', error);
+    console.error('Email Service: Verification success email failed -', error.message);
     return false;
   }
 };
@@ -170,7 +161,7 @@ exports.sendPasswordResetOTP = async (email, otp) => {
 
     return await sendEmail(mailOptions);
   } catch (error) {
-    console.error('Error sending password reset OTP:', error);
+    console.error('Email Service: Password reset OTP failed -', error.message);
     return false;
   }
 }; 

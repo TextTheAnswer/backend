@@ -93,6 +93,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   }
 }));
 
+// API Tester route
+app.get('/api-tester', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'api-tester.html'));
+});
+
 // Basic route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Text the Answer API' });
@@ -103,25 +108,29 @@ if (process.env.NODE_ENV === 'development') {
   app.get('/api/test-email', async (req, res) => {
     try {
       const emailService = require('./services/email.service');
+      console.log('Server: Testing email service...');
+      
       const result = await emailService.sendPasswordResetOTP(
         process.env.EMAIL_USER, // Send to self for testing
         '123456' // Test OTP
       );
       
       if (result) {
+        console.log('Server: Test email sent successfully');
         res.json({ 
           success: true, 
           message: 'Test email sent successfully! Check your email inbox.',
           emailSentTo: process.env.EMAIL_USER 
         });
       } else {
+        console.log('Server: Test email failed');
         res.status(500).json({ 
           success: false, 
           message: 'Failed to send test email. Check server logs for details.'
         });
       }
     } catch (error) {
-      console.error('Error in test email route:', error);
+      console.error('Server: Test email error -', error.message);
       res.status(500).json({ 
         success: false, 
         message: 'Error sending test email', 
@@ -149,10 +158,10 @@ const leaderboardSocket = require('./socket/leaderboard.socket')(io);
 
 // Default namespace for basic connections
 io.on('connection', (socket) => {
-  console.log('New client connected');
+  console.log('Socket: New client connected');
   
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
+    console.log('Socket: Client disconnected');
   });
 });
 
@@ -169,8 +178,8 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API Documentation available at http://localhost:${PORT}/api-docs`);
+  console.log(`Server: Running on port ${PORT}`);
+  console.log(`Server: API docs at http://localhost:${PORT}/api-docs`);
 });
 
 module.exports = { app, server, io };
