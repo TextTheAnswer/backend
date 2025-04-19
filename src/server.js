@@ -19,6 +19,7 @@ const subscriptionRoutes = require('./routes/subscription.routes');
 const subscriptionMockRoutes = require('./routes/subscription.mock.routes');
 const studyMaterialRoutes = require('./routes/studyMaterial.routes');
 const demoRoutes = require('./routes/demo.routes');
+const profileRoutes = require('./routes/profile.routes');
 
 // Initialize Express app
 const app = express();
@@ -31,15 +32,25 @@ const io = socketIo(server, {
 });
 
 // Connect to MongoDB
-connectDB();
+connectDB()
+  .then(() => {
+    console.log('Database connection established successfully');
+    
+    // Initialize database with seed data after connection is established
+    seedQuestions()
+      .then(() => console.log('Database seeding completed'))
+      .catch(err => console.error('Error seeding database:', err));
+      
+    // Schedule daily tasks after connection is established
+    scheduleDailyTasks();
+  })
+  .catch(err => {
+    console.error('Failed to connect to the database. Server will continue without seeding:', err);
+  });
 
 // Import utilities and services
 const { seedQuestions } = require('./utils/database.utils');
 const { scheduleDailyTasks } = require('./services/scheduler.service');
-
-// Initialize services
-seedQuestions().catch(err => console.error('Error seeding database:', err));
-scheduleDailyTasks();
 
 // Import Swagger documentation
 require('./docs/auth.swagger');
@@ -48,9 +59,18 @@ require('./docs/game.swagger');
 require('./docs/leaderboard.swagger');
 require('./docs/subscription.swagger');
 require('./docs/studyMaterial.swagger');
+require('./docs/profile.swagger');
 
 // Swagger setup
 const swaggerDocument = YAML.load(path.join(__dirname, 'docs', 'swagger.yaml'));
+
+// Dynamically load Swagger documentation from modules
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerOptions = {
+  definition: swaggerDocument,
+  apis: ['./src/docs/*.swagger.js'],
+};
+const swaggerSpec = swaggerJsDoc(swaggerOptions);
 
 // Middleware
 app.use(cors());
@@ -59,16 +79,66 @@ app.use(morgan('dev'));
 app.use(express.static('src/public')); // Add this line to serve static files
 
 // Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   explorer: true,
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "Text the Answer API Documentation"
+  customSiteTitle: "Text the Answer API Documentation",
+  swaggerOptions: {
+    persistAuthorization: false,
+    displayRequestDuration: true,
+    docExpansion: 'none',
+    filter: true,
+    supportedSubmitMethods: ['get', 'post', 'put', 'delete'],
+    tagsSorter: 'alpha'
+  }
 }));
+
+// API Tester route
+app.get('/api-tester', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'api-tester.html'));
+});
 
 // Basic route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Text the Answer API' });
 });
+
+// Test email route (only in development)
+if (process.env.NODE_ENV === 'development') {
+  app.get('/api/test-email', async (req, res) => {
+    try {
+      const emailService = require('./services/email.service');
+      console.log('Server: Testing email service...');
+      
+      const result = await emailService.sendPasswordResetOTP(
+        process.env.EMAIL_USER, // Send to self for testing
+        '123456' // Test OTP
+      );
+      
+      if (result) {
+        console.log('Server: Test email sent successfully');
+        res.json({ 
+          success: true, 
+          message: 'Test email sent successfully! Check your email inbox.',
+          emailSentTo: process.env.EMAIL_USER 
+        });
+      } else {
+        console.log('Server: Test email failed');
+        res.status(500).json({ 
+          success: false, 
+          message: 'Failed to send test email. Check server logs for details.'
+        });
+      }
+    } catch (error) {
+      console.error('Server: Test email error -', error.message);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error sending test email', 
+        error: error.message 
+      });
+    }
+  });
+}
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -79,6 +149,7 @@ app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/mock-subscription', subscriptionMockRoutes);
 app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Socket.IO setup
 // Initialize socket handlers
@@ -87,10 +158,10 @@ const leaderboardSocket = require('./socket/leaderboard.socket')(io);
 
 // Default namespace for basic connections
 io.on('connection', (socket) => {
-  console.log('New client connected');
+  console.log('Socket: New client connected');
   
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
+    console.log('Socket: Client disconnected');
   });
 });
 
@@ -107,8 +178,8 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API Documentation available at http://localhost:${PORT}/api-docs`);
+  console.log(`Server: Running on port ${PORT}`);
+  console.log(`Server: API docs at http://localhost:${PORT}/api-docs`);
 });
 
 module.exports = { app, server, io };

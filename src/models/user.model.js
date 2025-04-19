@@ -25,6 +25,23 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  profile: {
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
+    location: {
+      type: String,
+      trim: true
+    },
+    imageUrl: {
+      type: String
+    },
+    imagePublicId: {
+      type: String
+    }
+  },
   subscription: {
     status: {
       type: String,

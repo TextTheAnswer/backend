@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text The Answer - API Testing Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/api-tester.css">
+    <!-- Inline styles to fix immediate visibility issues -->
+    <style>
+        .sidebar {
+            transform: none !important;
+            display: block !important;
+            background-color: #f8f9fa;
+            border-right: 1px solid #ddd;
+        }
+        
+        @media (max-width: 767.98px) {
+            .sidebar {
+                display: none !important;
+            }
+            .sidebar.sidebar-active {
+                display: block !important;
+            }
+        }
+        
+        .navbar {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+        }
+        
+        @media (max-width: 767.98px) {
+            .main-content {
+                margin-left: 0;
+            }
+        }
+        
+        .user-guide {
+            display: block;
+            visibility: visible;
+        }
+        
+        .welcome-message, .category-header, .auth-status {
+            display: block;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-phone me-2"></i>Text The Answer - API Testing Portal
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="clear-logs-btn">
+                            <i class="bi bi-trash me-1"></i>Clear Response
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="toggle-theme-btn">
+                            <i class="bi bi-moon me-1"></i>Dark Mode
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-12 col-md-3 col-lg-2 p-0 sidebar">
+                <div class="nav flex-column">
+                    <div class="welcome-message">
+                        <h5>Welcome to the API Testing Portal</h5>
+                        <p>Click on any feature below to test it.</p>
+                    </div>
+
+                    <div class="category-header">User Management</div>
+                    <a class="nav-link active" href="#auth-register">
+                        <i class="bi bi-person-plus me-2"></i>Create Account
+                    </a>
+                    <a class="nav-link" href="#auth-login">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                    </a>
+                    <a class="nav-link" href="#auth-profile">
+                        <i class="bi bi-person-badge me-2"></i>User Profile
+                    </a>
+                    <a class="nav-link" href="#auth-logout">
+                        <i class="bi bi-box-arrow-left me-2"></i>Sign Out
+                    </a>
+
+                    <div class="category-header">Quiz Features</div>
+                    <a class="nav-link" href="#quiz-daily">
+                        <i class="bi bi-calendar-day me-2"></i>Daily Quiz
+                    </a>
+                    <a class="nav-link" href="#quiz-submit">
+                        <i class="bi bi-check-circle me-2"></i>Submit Answer
+                    </a>
+                    <a class="nav-link" href="#quiz-leaderboard">
+                        <i class="bi bi-trophy me-2"></i>Leaderboard
+                    </a>
+
+                    <div class="category-header">Multiplayer</div>
+                    <a class="nav-link" href="#game-create-lobby">
+                        <i class="bi bi-plus-circle me-2"></i>Create Game
+                    </a>
+                    <a class="nav-link" href="#game-join-lobby">
+                        <i class="bi bi-door-open me-2"></i>Join Game
+                    </a>
+                    <a class="nav-link" href="#game-results">
+                        <i class="bi bi-list-ol me-2"></i>Game Results
+                    </a>
+
+                    <div class="category-header">Subscription</div>
+                    <a class="nav-link" href="#sub-details">
+                        <i class="bi bi-credit-card me-2"></i>Subscription Status
+                    </a>
+                    <a class="nav-link" href="#sub-checkout">
+                        <i class="bi bi-cart-plus me-2"></i>Purchase Subscription
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-12 col-md-9 col-lg-10 main-content">
+                <!-- User guide -->
+                <div class="user-guide card mb-4">
+                    <div class="card-body">
+                        <h4><i class="bi bi-info-circle me-2"></i>How to use this testing portal</h4>
+                        <ol>
+                            <li>Start by creating an account or signing in using the options in the <strong>User Management</strong> section</li>
+                            <li>Once signed in, the status indicator on top will show "Authenticated"</li>
+                            <li>Then explore other features by clicking on them in the sidebar</li>
+                            <li>After each action, you'll see the server's response in the "Response" panel below</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Authentication Status -->
+                <div class="auth-status">
+                    <div>
+                        <i class="bi bi-shield-lock me-2"></i><strong>Account Status:</strong>
+                        <span id="auth-status-text" class="badge bg-danger ms-2">Not Signed In</span>
+                    </div>
+                    <button id="logout-btn" class="btn btn-sm btn-outline-danger ms-auto" style="display:none;">Sign Out</button>
+                </div>
+
+                <!-- Response Area -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-arrow-return-right me-2"></i>Response</span>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" id="copy-response-btn">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary ms-2" id="format-response-btn">
+                                <i class="bi bi-code-square me-1"></i>Format
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body position-relative">
+                        <div class="response-time" id="response-time-display">
+                            <i class="bi bi-clock me-1"></i><span id="response-time-value">0ms</span>
+                        </div>
+                        <div class="loading-overlay" id="loading-overlay">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="mt-3">Sending request...</div>
+                        </div>
+                        <div class="response-panel" id="response-display">Responses will appear here after you use a feature...</div>
+                    </div>
+                </div>
+
+                <!-- API Endpoints -->
+                <div id="endpoints-container">
+                    <!-- Auth - Register -->
+                    <div class="card" id="auth-register">
+                        <div class="card-header d-flex align-items-center">
+                            <span><i class="bi bi-person-plus me-2"></i>Create Account</span>
+                            <div class="ms-auto">
+                                <span class="badge rounded-pill bg-success">Create</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="endpoint-description mb-3">
+                                Create a new user account with your name, email, and password
+                            </div>
+                            <form id="register-form">
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" class="form-control" id="register-name" placeholder="Your full name" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="register-email" placeholder="your.email@example.com" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="register-password" placeholder="Create a secure password" required>
+                                </div>
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" id="register-is-student">
+                                    <label class="form-check-label">I'm a student (special education discount)</label>
+                                </div>
+                                <div id="student-fields" style="display:none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Student Email (.edu)</label>
+                                        <input type="email" class="form-control" id="register-student-email" placeholder="your.name@university.edu">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Year of Study (1-7)</label>
+                                        <select class="form-select" id="register-year-of-study">
+                                            <option value="1">Year 1</option>
+                                            <option value="2">Year 2</option>
+                                            <option value="3">Year 3</option>
+                                            <option value="4">Year 4</option>
+                                            <option value="5">Year 5</option>
+                                            <option value="6">Year 6</option>
+                                            <option value="7">Year 7</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Create Account</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Auth - Login -->
+                    <div class="card" id="auth-login">
+                        <div class="card-header d-flex align-items-center">
+                            <span><i class="bi bi-box-arrow-in-right me-2"></i>Sign In</span>
+                            <div class="ms-auto">
+                                <span class="badge rounded-pill bg-success">Login</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="endpoint-description mb-3">
+                                Sign in to your existing account with email and password
+                            </div>
+                            <form id="login-form">
+                                <div class="mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="login-email" placeholder="your.email@example.com" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="login-password" placeholder="Your password" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Sign In</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Auth - Get Profile -->
+                    <div class="card" id="auth-profile">
+                        <div class="card-header d-flex align-items-center">
+                            <span><i class="bi bi-person-badge me-2"></i>User Profile</span>
+                            <div class="ms-auto">
+                                <span class="badge rounded-pill bg-primary">View</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="endpoint-description mb-3">
+                                View your account profile information and subscription status
+                            </div>
+                            <div class="auth-warning alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>You must be signed in to use this feature
+                            </div>
+                            <button type="button" class="btn btn-primary" id="get-profile-btn">View My Profile</button>
+                        </div>
+                    </div>
+
+                    <!-- More endpoint cards will be generated via JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer py-3 mt-5">
+        <div class="container text-center">
+            <span class="text-muted">Text The Answer API Testing Portal | For Internal Use Only</span>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/api-tester.js"></script>
+</body>
+</html> 

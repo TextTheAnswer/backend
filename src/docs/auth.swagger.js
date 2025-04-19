@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Authentication
- *   description: User authentication and management endpoints
+ *   description: User authentication and management endpoints. Registration and login endpoints are publicly accessible, while profile and logout endpoints require authentication.
  * 
  * components:
  *   schemas:
@@ -109,9 +109,9 @@
  *
  * /api/auth/register:
  *   post:
- *     summary: Register a new user
+ *     summary: Register a new user (No authentication required)
  *     tags: [Authentication]
- *     description: Create a new user account
+ *     description: Create a new user account. This endpoint is publicly accessible.
  *     requestBody:
  *       required: true
  *       content:
@@ -132,9 +132,9 @@
  *
  * /api/auth/login:
  *   post:
- *     summary: Login user
+ *     summary: Login user (No authentication required)
  *     tags: [Authentication]
- *     description: Login with email and password
+ *     description: Login with email and password. This endpoint is publicly accessible.
  *     requestBody:
  *       required: true
  *       content:
@@ -155,9 +155,9 @@
  *
  * /api/auth/profile:
  *   get:
- *     summary: Get user profile
+ *     summary: Get user profile (Authentication required)
  *     tags: [Authentication]
- *     description: Get the authenticated user's profile
+ *     description: Get the authenticated user's profile. This endpoint requires a valid JWT token.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -181,9 +181,9 @@
  *
  * /api/auth/logout:
  *   post:
- *     summary: Logout user
+ *     summary: Logout user (Authentication required)
  *     tags: [Authentication]
- *     description: Logout the authenticated user
+ *     description: Logout the authenticated user. This endpoint requires a valid JWT token.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -196,9 +196,9 @@
  *
  * /api/auth/verify-student/{token}:
  *   get:
- *     summary: Verify student email
+ *     summary: Verify student email (No authentication required)
  *     tags: [Authentication]
- *     description: Verify a student's email using the verification token
+ *     description: Verify a student's email using the verification token. This endpoint is publicly accessible.
  *     parameters:
  *       - in: path
  *         name: token

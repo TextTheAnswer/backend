@@ -1,0 +1,43 @@
+Text the Answer - Backend Features
+User Management & Authentication
+User registration with email/password
+Login with JWT token-based authentication
+Student user registration with education tier benefits
+Student email verification system
+Password reset with OTP via email
+Profile management
+Quiz & Study Features
+Daily quiz generation and tracking
+Study materials organized by category
+Question database with seeding functionality
+Multiplayer Game Features
+Real-time multiplayer quiz games
+Public and private lobby system
+Socket.IO integration for real-time updates
+Game history tracking
+Subscription Management
+Tiered subscription system (Free, Premium, Education)
+Mock subscription service for testing premium features
+Demo user creation for testing premium features
+Leaderboard & Scoring
+Global and friend-based leaderboards
+Score tracking and history
+Real-time leaderboard updates via Socket.IO
+API & Documentation
+Comprehensive API documentation with Swagger UI
+Rate limiting and security features
+Structured error handling
+Email System
+Email notifications for verification and password reset
+Custom email templates with HTML/text fallback
+Configurable SMTP settings
+Technical Features
+MongoDB database integration with connection retry logic
+Scalable server architecture
+Environment-based configuration
+Middleware for authentication and validation
+Development & Testing
+Development mode with enhanced logging
+Testing endpoints for features like email
+Mock subscription APIs for testing without payment processing
+Would you like me to elaborate on any specific feature area?

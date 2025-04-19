@@ -15,6 +15,12 @@ info:
     Authorization: Bearer YOUR_TOKEN_HERE
     ```
 
+    ## Public Endpoints
+    The following endpoints do not require authentication:
+    - `/auth/register` and `/auth/login` - User registration and login
+    - `/leaderboard/daily` - Public daily leaderboard
+    - Various other public endpoints marked as "Auth required: No"
+
     ## Subscription Tiers
     - **Free**: Limited to 10 questions per day
     - **Premium**: Unlimited questions, multiplayer games, premium features
@@ -39,8 +45,8 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
-security:
-  - bearerAuth: []
+# Removed global security requirement
+# Individual endpoints will specify their own security requirements
 
 tags:
   - name: Authentication
@@ -55,5 +61,7 @@ tags:
     description: Subscription management endpoints
   - name: Study Materials
     description: Study material management (Education Tier)
+  - name: Profile
+    description: User profile management including profile images (Authentication required)
 
 paths: {}

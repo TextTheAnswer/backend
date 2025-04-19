@@ -551,6 +551,211 @@
     }
     ```
 
+## Profile Management Endpoints
+
+### Update user profile
+- **URL**: `/profile`
+- **Method**: `PUT`
+- **Auth required**: Yes (JWT token in Authorization header)
+- **Request body**:
+  ```json
+  {
+    "name": "New User Name",
+    "bio": "A short bio about me",
+    "location": "New York, USA"
+  }
+  ```
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "Profile updated successfully",
+      "user": {
+        "id": "user_id",
+        "email": "user@example.com",
+        "name": "New User Name",
+        "profile": {
+          "bio": "A short bio about me",
+          "location": "New York, USA",
+          "imageUrl": "https://res.cloudinary.com/example/image/upload/profile.jpg"
+        },
+        "subscription": "premium",
+        "stats": {
+          "streak": 5,
+          "totalCorrect": 150,
+          "totalAnswered": 200
+        },
+        "isPremium": true
+      }
+    }
+    ```
+
+### Upload profile image
+- **URL**: `/profile/image`
+- **Method**: `POST`
+- **Auth required**: Yes (JWT token in Authorization header)
+- **Content-Type**: `multipart/form-data`
+- **Request parameters**:
+  - `image`: Image file (JPG, PNG, etc.)
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "Profile image uploaded successfully",
+      "profile": {
+        "imageUrl": "https://res.cloudinary.com/example/image/upload/profile.jpg"
+      }
+    }
+    ```
+
+### Delete profile image
+- **URL**: `/profile/image`
+- **Method**: `DELETE`
+- **Auth required**: Yes (JWT token in Authorization header)
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "Profile image deleted successfully"
+    }
+    ```
+
+### Get comprehensive profile data
+- **URL**: `/profile/full`
+- **Method**: `GET`
+- **Auth required**: Yes (JWT token in Authorization header)
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "profile": {
+        "id": "user_id",
+        "email": "user@example.com",
+        "name": "User Name",
+        "profile": {
+          "bio": "A short bio about me",
+          "location": "New York, USA",
+          "imageUrl": "https://res.cloudinary.com/example/image/upload/profile.jpg"
+        },
+        "subscription": {
+          "status": "premium",
+          "currentPeriodEnd": "2023-05-01T00:00:00.000Z",
+          "cancelAtPeriodEnd": false
+        },
+        "stats": {
+          "streak": 5,
+          "lastPlayed": "2023-04-15T10:30:00.000Z",
+          "totalCorrect": 150,
+          "totalAnswered": 200,
+          "accuracy": "75.00%"
+        },
+        "dailyQuiz": {
+          "lastCompleted": "2023-04-15T10:30:00.000Z",
+          "questionsAnswered": 5,
+          "correctAnswers": 4,
+          "score": 450
+        },
+        "isPremium": true,
+        "isEducation": false
+      }
+    }
+    ```
+
+### Change password (for logged in users)
+- **URL**: `/profile/password/change`
+- **Method**: `POST`
+- **Auth required**: Yes (JWT token in Authorization header)
+- **Request body**:
+  ```json
+  {
+    "currentPassword": "currentPassword",
+    "newPassword": "newSecurePassword",
+    "confirmPassword": "newSecurePassword"
+  }
+  ```
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "Password changed successfully"
+    }
+    ```
+
+### Request password reset (send OTP)
+- **URL**: `/profile/password-reset/request`
+- **Method**: `POST`
+- **Auth required**: No
+- **Request body**:
+  ```json
+  {
+    "email": "user@example.com"
+  }
+  ```
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "If your email is registered, you will receive a password reset OTP"
+    }
+    ```
+
+### Verify OTP for password reset
+- **URL**: `/profile/password-reset/verify`
+- **Method**: `POST`
+- **Auth required**: No
+- **Request body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "otp": "123456"
+  }
+  ```
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "OTP verified successfully",
+      "resetToken": "a8b5c7d9e2f4a6b8c0d2e4f6a8b0c2d4"
+    }
+    ```
+
+### Reset password after OTP verification
+- **URL**: `/profile/password-reset/reset`
+- **Method**: `POST`
+- **Auth required**: No
+- **Request body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "resetToken": "a8b5c7d9e2f4a6b8c0d2e4f6a8b0c2d4",
+    "newPassword": "newSecurePassword",
+    "confirmPassword": "newSecurePassword"
+  }
+  ```
+- **Success Response**: 
+  - **Code**: 200
+  - **Content**: 
+    ```json
+    {
+      "success": true,
+      "message": "Password reset successful. You can now log in with your new password."
+    }
+    ```
+
 ## Socket.IO Events
 
 ### Game Namespace (/game)
@@ -605,3 +810,11 @@
   - Payload: `{ gameId, leaderboard, userRank }`
 - `error`: Error message
   - Payload: `{ message }`
+
+## Public Endpoints
+
+The following endpoints do not require authentication:
+
+- `/auth/register` and `/auth/login` - User registration and login
+- `/leaderboard/daily` - Public daily leaderboard
+- Various other public endpoints marked as "Auth required: No"

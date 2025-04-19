@@ -1,6 +1,8 @@
 const User = require('../models/user.model');
 const { generateToken } = require('../utils/jwt.utils');
 const emailService = require('../services/email.service');
+const bcrypt = require('bcrypt');
+const logger = require('../utils/logger');
 
 // Register a new user
 exports.register = async (req, res) => {
@@ -52,6 +54,7 @@ exports.register = async (req, res) => {
     }
 
     await user.save();
+    logger.info(`New user registered with email: ${email}`);
 
     // Send verification email for student accounts
     if (isStudent) {
@@ -83,7 +86,7 @@ exports.register = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Error registering user',
@@ -100,6 +103,7 @@ exports.login = async (req, res) => {
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
+      logger.debug(`Login attempt failed for non-existent email: ${email}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -108,6 +112,7 @@ exports.login = async (req, res) => {
 
     // Check if user has a password (might be Apple OAuth user)
     if (!user.password) {
+      logger.debug(`Login attempt for Apple OAuth user: ${email}`);
       return res.status(401).json({
         success: false,
         message: 'This account uses Apple Sign In. Please login with Apple.'
@@ -117,6 +122,7 @@ exports.login = async (req, res) => {
     // Verify password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      logger.debug(`Login attempt with incorrect password for: ${email}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -125,6 +131,7 @@ exports.login = async (req, res) => {
 
     // Generate JWT token
     const token = generateToken(user._id);
+    logger.info(`User logged in: ${email}`);
 
     res.status(200).json({
       success: true,
@@ -139,7 +146,7 @@ exports.login = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Error logging in',
@@ -154,12 +161,14 @@ exports.getProfile = async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     
     if (!user) {
+      logger.warn(`Profile request for non-existent user ID: ${req.user.id}`);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
 
+    logger.debug(`Profile retrieved for user: ${user.email}`);
     res.status(200).json({
       success: true,
       user: {
@@ -178,7 +187,7 @@ exports.getProfile = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    logger.error('Get profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching user profile',
@@ -193,6 +202,7 @@ exports.appleCallback = async (req, res) => {
     // This would be handled by Supabase in the actual implementation
     // Here we're just creating a placeholder for the integration
     const { appleId, email, name } = req.body;
+    logger.info(`Apple OAuth callback received for email: ${email}`);
 
     // Check if user already exists with this Apple ID
     let user = await User.findOne({ appleId });
@@ -203,10 +213,12 @@ exports.appleCallback = async (req, res) => {
       
       if (user) {
         // Link Apple ID to existing account
+        logger.info(`Linking Apple ID to existing account: ${email}`);
         user.appleId = appleId;
         await user.save();
       } else {
         // Create new user
+        logger.info(`Creating new user via Apple OAuth: ${email}`);
         user = new User({
           email,
           name,
@@ -232,7 +244,7 @@ exports.appleCallback = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Apple OAuth error:', error);
+    logger.error('Apple OAuth error:', error);
     res.status(500).json({
       success: false,
       message: 'Error with Apple authentication',
@@ -245,6 +257,7 @@ exports.appleCallback = async (req, res) => {
 exports.logout = (req, res) => {
   // In a real implementation, you might want to blacklist the token
   // or implement a token revocation mechanism
+  logger.info(`Logout request from user ID: ${req.user.id}`);
   res.status(200).json({
     success: true,
     message: 'Logged out successfully'
@@ -285,11 +298,139 @@ exports.verifyStudentEmail = async (req, res) => {
       message: 'Student email verified successfully. You now have access to education tier benefits.'
     });
   } catch (error) {
-    console.error('Verification error:', error);
+    logger.error('Verification error:', error);
     res.status(500).json({
       success: false,
       message: 'Error verifying student email',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
+};
+
+/**
+ * Create a demo user with all access features
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.createDemoUser = async (req, res) => {
+    try {
+        // Check if demo user already exists
+        const existingUser = await User.findOne({ email: 'demouser@gmail.com' });
+        
+        if (existingUser) {
+            // Return the existing demo user
+            const token = generateToken(existingUser);
+            return res.status(200).json({
+                success: true,
+                message: 'Demo user logged in',
+                token,
+                user: {
+                    id: existingUser._id,
+                    name: existingUser.name,
+                    email: existingUser.email,
+                    role: existingUser.role,
+                    subscription: existingUser.subscription
+                }
+            });
+        }
+        
+        // Create a new demo user
+        const newUser = new User({
+            name: 'Demo User',
+            email: 'demouser@gmail.com',
+            password: await bcrypt.hash('murewa20june2007', 10),
+            isVerified: true,
+            role: 'premium',
+            subscription: {
+                status: 'premium',
+                since: new Date(),
+                features: ['all_access', 'education', 'premium_content']
+            }
+        });
+        
+        await newUser.save();
+        
+        // Generate JWT token
+        const token = generateToken(newUser);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Demo user created successfully',
+            token,
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                role: newUser.role,
+                subscription: newUser.subscription
+            }
+        });
+    } catch (error) {
+        logger.error('Error creating demo user:', error);
+        res.status(500).json({ success: false, message: 'Error creating demo user', error: error.message });
+    }
+};
+
+/**
+ * Create a second demo user with all access features
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.createDemoUser2 = async (req, res) => {
+    try {
+        // Check if demo user already exists
+        const existingUser = await User.findOne({ email: 'demouser2@gmail.com' });
+        
+        if (existingUser) {
+            // Return the existing demo user
+            const token = generateToken(existingUser);
+            return res.status(200).json({
+                success: true,
+                message: 'Demo user 2 logged in',
+                token,
+                user: {
+                    id: existingUser._id,
+                    name: existingUser.name,
+                    email: existingUser.email,
+                    role: existingUser.role,
+                    subscription: existingUser.subscription
+                }
+            });
+        }
+        
+        // Create a new demo user
+        const newUser = new User({
+            name: 'Demo User 2',
+            email: 'demouser2@gmail.com',
+            password: await bcrypt.hash('murewa20june2007', 10),
+            isVerified: true,
+            role: 'education',
+            subscription: {
+                status: 'education',
+                since: new Date(),
+                features: ['all_access', 'education', 'premium_content']
+            }
+        });
+        
+        await newUser.save();
+        
+        // Generate JWT token
+        const token = generateToken(newUser);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Demo user 2 created successfully',
+            token,
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                role: newUser.role,
+                subscription: newUser.subscription
+            }
+        });
+    } catch (error) {
+        logger.error('Error creating demo user 2:', error);
+        res.status(500).json({ success: false, message: 'Error creating demo user 2', error: error.message });
+    }
 };
