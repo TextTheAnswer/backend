@@ -33,8 +33,8 @@ function initializeUI() {
     updateThemeButtonText();
     
     // Update auth status display
-    updateAuthStatus();
-    
+updateAuthStatus();
+
     // Show/hide sidebar on mobile
     const sidebarToggle = document.querySelector('.navbar-toggler');
     if (sidebarToggle) {
@@ -213,7 +213,7 @@ async function handleRegisterForm(e) {
 }
 
 async function handleGetProfile(e) {
-    e.preventDefault();
+                e.preventDefault();
     await makeApiRequest('/users/profile', 'GET', null, true);
 }
 
@@ -445,4 +445,4 @@ function showActiveSection() {
 function showMessage(message, type = 'success') {
     // Create a simple alert instead of toast
     alert(message);
-}
+} 

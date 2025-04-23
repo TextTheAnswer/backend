@@ -56,6 +56,14 @@
       "explanation": "The square root of 144 is 12, because 12 × 12 = 144."
     },
     {
+      "text": "What is the square root of 144?",
+      "options": ["12", "14", "16", "18"],
+      "correctAnswer": 0,
+      "category": "Mathematics",
+      "difficulty": "medium",
+      "explanation": "The square root of 144 is 12, because 12 × 12 = 144."
+    }, 
+    {
       "text": "Which element has the chemical symbol 'O'?",
       "options": ["Osmium", "Oxygen", "Oganesson", "Olivine"],
       "correctAnswer": 1,
