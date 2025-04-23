@@ -1,0 +1,329 @@
+/* CSS styles for the API Tester interface */
+:root {
+  --primary-color: #4a6fa5;
+  --secondary-color: #166088;
+  --accent-color: #4fc3f7;
+  --success-color: #4caf50;
+  --warning-color: #ff9800;
+  --error-color: #f44336;
+  --light-bg: #f5f7fa;
+  --dark-bg: #2c3e50;
+  --text-color: #333;
+  --light-text: #fff;
+  --border-color: #ddd;
+  --premium-color: #ffc107;
+  --education-color: #9c27b0;
+  --free-color: #8bc34a;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+  background-color: var(--light-bg);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: var(--primary-color);
+  color: var(--light-text);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+h2 {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  color: var(--secondary-color);
+  border-bottom: 2px solid var(--accent-color);
+  padding-bottom: 10px;
+}
+
+h3 {
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  color: var(--secondary-color);
+}
+
+h4 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  color: var(--secondary-color);
+}
+
+.auth-section, .api-section, .response-section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.token-display {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.token-display input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.demo-users {
+  margin-bottom: 20px;
+}
+
+.demo-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.demo-btn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s;
+}
+
+.demo-btn.free {
+  background-color: var(--free-color);
+}
+
+.demo-btn.premium {
+  background-color: var(--premium-color);
+  color: var(--text-color);
+}
+
+.demo-btn.education {
+  background-color: var(--education-color);
+}
+
+.demo-btn:hover {
+  opacity: 0.9;
+}
+
+.auth-tabs, .api-tabs {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.tab-btn {
+  padding: 10px 15px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-color);
+  transition: all 0.3s;
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+  border-bottom: 3px solid var(--primary-color);
+}
+
+.tab-btn:hover:not(.active) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.tab-content {
+  margin-top: 20px;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+input, textarea, select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox input {
+  width: auto;
+  margin-right: 10px;
+}
+
+.checkbox label {
+  margin-bottom: 0;
+}
+
+button {
+  padding: 10px 15px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: var(--secondary-color);
+}
+
+#copy-token, #clear-token {
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.response-container {
+  background-color: var(--dark-bg);
+  color: var(--light-text);
+  padding: 15px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 400px;
+}
+
+pre {
+  font-family: 'Courier New', Courier, monospace;
+  white-space: pre-wrap;
+}
+
+.premium-feature, .education-feature {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid var(--premium-color);
+  padding: 10px;
+  margin-bottom: 15px;
+  border-radius: 0 4px 4px 0;
+}
+
+.education-feature {
+  background-color: rgba(156, 39, 176, 0.1);
+  border-left-color: var(--education-color);
+}
+
+.premium-feature p, .education-feature p {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* New styles for questions display */
+.questions-list {
+  margin-bottom: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.question-item {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.question-item:last-child {
+  border-bottom: none;
+}
+
+.question-item:hover {
+  background-color: rgba(79, 195, 247, 0.1);
+}
+
+.question-item.selected {
+  background-color: rgba(79, 195, 247, 0.2);
+  border-left: 3px solid var(--accent-color);
+}
+
+.question-display {
+  background-color: var(--light-bg);
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 3px solid var(--accent-color);
+}
+
+.no-questions {
+  color: var(--text-color);
+  opacity: 0.7;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .token-display {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .token-display input {
+    margin-bottom: 10px;
+  }
+  
+  .auth-tabs, .api-tabs {
+    flex-wrap: wrap;
+  }
+  
+  .tab-btn {
+    flex: 1 0 auto;
+  }
+}

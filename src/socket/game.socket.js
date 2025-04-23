@@ -1,10 +1,20 @@
 const Lobby = require('../models/lobby.model');
 const Game = require('../models/game.model');
 const Question = require('../models/question.model');
+const User = require('../models/user.model'); // Added missing User model import
+const logger = require('../utils/logger'); // Use consistent logging
 
+/**
+ * Socket.io handler for game-related events
+ * @param {Object} io - Socket.io instance
+ * @returns {Object} - Game namespace
+ */
 module.exports = function(io) {
   // Namespace for game-related socket events
   const gameNamespace = io.of('/game');
+  
+  // Store active timers to prevent memory leaks
+  const questionTimers = new Map();
   
   // Middleware to authenticate socket connections
   gameNamespace.use(async (socket, next) => {
@@ -15,18 +25,28 @@ module.exports = function(io) {
         return next(new Error('Authentication required'));
       }
       
+      // Verify user exists in database
+      const user = await User.findById(userId);
+      if (!user) {
+        return next(new Error('User not found'));
+      }
+      
       // Store user ID in socket object
       socket.userId = userId;
       next();
     } catch (error) {
+      logger.error('Socket authentication error:', error);
       next(new Error('Authentication failed'));
     }
   });
   
   gameNamespace.on('connection', (socket) => {
-    console.log(`User ${socket.userId} connected to game namespace`);
+    logger.info(`User ${socket.userId} connected to game namespace`);
     
-    // Join a lobby room
+    /**
+     * Join a lobby room
+     * @param {string} lobbyId - ID of the lobby to join
+     */
     socket.on('join-lobby', async (lobbyId) => {
       try {
         // Find the lobby
@@ -71,12 +91,15 @@ module.exports = function(io) {
           status: lobby.status
         });
       } catch (error) {
-        console.error('Socket join-lobby error:', error);
+        logger.error('Socket join-lobby error:', error);
         socket.emit('error', { message: 'Error joining lobby room' });
       }
     });
     
-    // Leave a lobby room
+    /**
+     * Leave a lobby room
+     * @param {string} lobbyId - ID of the lobby to leave
+     */
     socket.on('leave-lobby', async (lobbyId) => {
       try {
         // Leave the lobby room
@@ -92,14 +115,27 @@ module.exports = function(io) {
           });
         }
       } catch (error) {
-        console.error('Socket leave-lobby error:', error);
+        logger.error('Socket leave-lobby error:', error);
+        socket.emit('error', { message: 'Error leaving lobby' });
       }
     });
     
-    // Set player ready status
+    /**
+     * Set player ready status
+     * @param {Object} data - Contains lobbyId and ready status
+     */
     socket.on('set-ready', async (data) => {
       try {
         const { lobbyId, ready } = data;
+        
+        // Validate input
+        if (!lobbyId) {
+          return socket.emit('error', { message: 'Lobby ID is required' });
+        }
+        
+        if (typeof ready !== 'boolean') {
+          return socket.emit('error', { message: 'Ready status must be a boolean' });
+        }
         
         // Find the lobby
         const lobby = await Lobby.findById(lobbyId);
@@ -131,14 +167,22 @@ module.exports = function(io) {
           gameNamespace.to(`lobby:${lobbyId}`).emit('all-players-ready');
         }
       } catch (error) {
-        console.error('Socket set-ready error:', error);
+        logger.error('Socket set-ready error:', error);
         socket.emit('error', { message: 'Error updating ready status' });
       }
     });
     
-    // Join a game room
+    /**
+     * Join a game room
+     * @param {string} gameId - ID of the game to join
+     */
     socket.on('join-game', async (gameId) => {
       try {
+        // Validate input
+        if (!gameId) {
+          return socket.emit('error', { message: 'Game ID is required' });
+        }
+        
         // Find the game
         const game = await Game.findById(gameId);
         
@@ -161,15 +205,27 @@ module.exports = function(io) {
           userId: socket.userId
         });
       } catch (error) {
-        console.error('Socket join-game error:', error);
+        logger.error('Socket join-game error:', error);
         socket.emit('error', { message: 'Error joining game room' });
       }
     });
     
-    // Start question timer
+    /**
+     * Start question timer
+     * @param {Object} data - Contains gameId and questionIndex
+     */
     socket.on('start-question', async (data) => {
       try {
         const { gameId, questionIndex } = data;
+        
+        // Validate input
+        if (!gameId) {
+          return socket.emit('error', { message: 'Game ID is required' });
+        }
+        
+        if (typeof questionIndex !== 'number' || questionIndex < 0) {
+          return socket.emit('error', { message: 'Valid question index is required' });
+        }
         
         // Find the game
         const game = await Game.findById(gameId);
@@ -220,13 +276,24 @@ module.exports = function(io) {
           startTime: game.questions[questionIndex].startTime
         });
         
+        // Clear any existing timer for this game and question
+        if (questionTimers.has(`${gameId}-${questionIndex}`)) {
+          clearTimeout(questionTimers.get(`${gameId}-${questionIndex}`));
+        }
+        
         // Set a timer to end the question after 20 seconds
-        setTimeout(async () => {
+        const timerId = setTimeout(async () => {
           try {
+            // Remove timer from map once executed
+            questionTimers.delete(`${gameId}-${questionIndex}`);
+            
             // Find the game again to get latest state
             const updatedGame = await Game.findById(gameId);
             
-            if (!updatedGame) return;
+            if (!updatedGame) {
+              logger.warn(`Game ${gameId} not found during question timer completion`);
+              return;
+            }
             
             // Set question end time
             updatedGame.questions[questionIndex].endTime = new Date();
@@ -269,18 +336,178 @@ module.exports = function(io) {
               });
             }
           } catch (error) {
-            console.error('Question timer error:', error);
+            logger.error('Question timer error:', error);
           }
         }, 20000); // 20 seconds per question
+        
+        // Store timer reference to allow cancellation if needed
+        questionTimers.set(`${gameId}-${questionIndex}`, timerId);
+        
       } catch (error) {
-        console.error('Socket start-question error:', error);
+        logger.error('Socket start-question error:', error);
         socket.emit('error', { message: 'Error starting question' });
       }
     });
     
-    // Disconnect event
+    /**
+     * Submit answer for a question
+     * @param {Object} data - Contains gameId, questionIndex, and answer
+     */
+    socket.on('submit-answer', async (data) => {
+      try {
+        const { gameId, questionIndex, answer } = data;
+        
+        // Validate input
+        if (!gameId || typeof questionIndex !== 'number' || answer === undefined) {
+          return socket.emit('error', { message: 'Invalid input parameters' });
+        }
+        
+        // Find the game
+        const game = await Game.findById(gameId);
+        if (!game) {
+          return socket.emit('error', { message: 'Game not found' });
+        }
+        
+        // Check if user is in the game
+        const playerIndex = game.players.findIndex(p => p.user.toString() === socket.userId);
+        if (playerIndex === -1) {
+          return socket.emit('error', { message: 'You are not in this game' });
+        }
+        
+        // Check if question exists and is active
+        if (!game.questions[questionIndex] || !game.questions[questionIndex].startTime) {
+          return socket.emit('error', { message: 'Question not active' });
+        }
+        
+        // Check if answer already submitted
+        if (game.questions[questionIndex].answers.some(a => a.player.toString() === socket.userId)) {
+          return socket.emit('error', { message: 'Answer already submitted' });
+        }
+        
+        // Get question details
+        const questionId = game.questions[questionIndex].question;
+        const question = await Question.findById(questionId);
+        if (!question) {
+          return socket.emit('error', { message: 'Question not found in database' });
+        }
+        
+        // Calculate score based on answer time
+        const startTime = new Date(game.questions[questionIndex].startTime);
+        const answerTime = new Date();
+        const timeElapsed = (answerTime - startTime) / 1000; // in seconds
+        
+        // Check if answer is correct
+        const isCorrect = answer === question.correctAnswer;
+        
+        // Base score calculation
+        let score = 0;
+        if (isCorrect) {
+          // Base score for correct answer
+          const baseScore = 100;
+          
+          // Time bonus (max 100 points, decreases as time passes)
+          const timeBonus = Math.max(0, Math.floor(100 * (1 - timeElapsed / 20)));
+          
+          // Difficulty multiplier
+          let difficultyMultiplier = 1;
+          if (question.difficulty === 'medium') difficultyMultiplier = 1.5;
+          if (question.difficulty === 'hard') difficultyMultiplier = 2;
+          
+          score = Math.floor((baseScore + timeBonus) * difficultyMultiplier);
+        }
+        
+        // Record the answer
+        game.questions[questionIndex].answers.push({
+          player: socket.userId,
+          answer,
+          isCorrect,
+          score,
+          answerTime
+        });
+        
+        // Update player's score
+        game.players[playerIndex].score += score;
+        if (isCorrect) {
+          game.players[playerIndex].correctAnswers += 1;
+        }
+        
+        await game.save();
+        
+        // Send result to the player
+        socket.emit('answer-result', {
+          isCorrect,
+          correctAnswer: question.correctAnswer,
+          explanation: question.explanation,
+          score,
+          totalScore: game.players[playerIndex].score
+        });
+        
+        // Check if all players have answered
+        const allAnswered = game.players.length === game.questions[questionIndex].answers.length;
+        
+        // Notify all players about the progress
+        gameNamespace.to(`game:${gameId}`).emit('answer-progress', {
+          questionIndex,
+          answeredCount: game.questions[questionIndex].answers.length,
+          totalPlayers: game.players.length,
+          allAnswered
+        });
+        
+        // If all players have answered, end the question early
+        if (allAnswered && questionTimers.has(`${gameId}-${questionIndex}`)) {
+          clearTimeout(questionTimers.get(`${gameId}-${questionIndex}`));
+          questionTimers.delete(`${gameId}-${questionIndex}`);
+          
+          // Set question end time
+          game.questions[questionIndex].endTime = new Date();
+          await game.save();
+          
+          // Notify all players that all have answered
+          gameNamespace.to(`game:${gameId}`).emit('question-ended', {
+            questionIndex,
+            correctAnswer: question.correctAnswer,
+            explanation: question.explanation,
+            allAnswered: true
+          });
+          
+          // If this was the last question, end the game
+          if (questionIndex === game.questions.length - 1) {
+            await game.endGame();
+            
+            // Get winner details
+            let winner = null;
+            if (game.winner) {
+              const winnerUser = await User.findById(game.winner).select('name');
+              if (winnerUser) {
+                winner = {
+                  id: winnerUser._id,
+                  name: winnerUser.name
+                };
+              }
+            }
+            
+            // Notify all players that the game has ended
+            gameNamespace.to(`game:${gameId}`).emit('game-ended', {
+              winner,
+              players: game.players.map(p => ({
+                id: p.user,
+                score: p.score,
+                correctAnswers: p.correctAnswers
+              }))
+            });
+          }
+        }
+      } catch (error) {
+        logger.error('Socket submit-answer error:', error);
+        socket.emit('error', { message: 'Error submitting answer' });
+      }
+    });
+    
+    // Clean up on disconnect
     socket.on('disconnect', () => {
-      console.log(`User ${socket.userId} disconnected from game namespace`);
+      logger.info(`User ${socket.userId} disconnected from game namespace`);
+      
+      // Any additional cleanup can be added here
     });
   });
   

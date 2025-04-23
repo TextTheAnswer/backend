@@ -1,6 +1,7 @@
 const User = require('../models/user.model');
 const Question = require('../models/question.model');
 const DailyQuiz = require('../models/dailyQuiz.model');
+const Category = require('../models/category.model');
 const moment = require('moment');
 
 // Get today's quiz questions
@@ -23,7 +24,7 @@ exports.getDailyQuestions = async (req, res) => {
     // Return questions without correct answers
     const questions = dailyQuiz.questions.map(q => {
       const questionData = {
-        id: q._id,
+        _id: q._id,
         text: q.text,
         category: q.category,
         difficulty: q.difficulty,
@@ -43,7 +44,11 @@ exports.getDailyQuestions = async (req, res) => {
       success: true,
       questions,
       questionsAnswered: user.dailyQuiz.questionsAnswered,
-      correctAnswers: user.dailyQuiz.correctAnswers
+      correctAnswers: user.dailyQuiz.correctAnswers,
+      theme: {
+        name: dailyQuiz.themeName,
+        description: dailyQuiz.themeDescription
+      }
     });
   } catch (error) {
     console.error('Get daily questions error:', error);
@@ -154,6 +159,9 @@ exports.submitAnswer = async (req, res) => {
     
     await user.save();
     
+    // Update question usage statistics
+    await question.updateUsage();
+    
     // Update daily quiz leaderboard if needed
     const dailyQuiz = await DailyQuiz.getTodayQuiz();
     // If user got all 10 questions correct and has a higher score than current leader
@@ -232,6 +240,10 @@ exports.getDailyLeaderboard = async (req, res) => {
       leaderboard,
       userRank,
       userScore,
+      theme: {
+        name: dailyQuiz.themeName,
+        description: dailyQuiz.themeDescription
+      },
       winner: dailyQuiz.winner ? {
         id: dailyQuiz.winner,
         score: dailyQuiz.highestScore
@@ -242,6 +254,72 @@ exports.getDailyLeaderboard = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching daily leaderboard',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Get all available categories
+exports.getCategories = async (req, res) => {
+  try {
+    const categories = await Category.find({ active: true }).sort({ order: 1 });
+    
+    res.status(200).json({
+      success: true,
+      categories
+    });
+  } catch (error) {
+    console.error('Get categories error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching categories',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Get upcoming themes for the week
+exports.getUpcomingThemes = async (req, res) => {
+  try {
+    // Only premium users can see upcoming themes
+    if (req.user.subscription.status === 'free') {
+      return res.status(403).json({
+        success: false,
+        message: 'Upgrade to premium to see upcoming themes'
+      });
+    }
+    
+    const today = moment().startOf('day');
+    const upcomingThemes = [];
+    
+    // Get quizzes for the next 7 days
+    for (let i = 1; i <= 7; i++) {
+      const date = moment(today).add(i, 'days');
+      const formattedDate = date.format('YYYY-MM-DD');
+      
+      // Try to get existing quiz for this date
+      let quiz = await DailyQuiz.findOne({ 
+        date: date.toDate() 
+      }).populate('theme');
+      
+      if (quiz) {
+        upcomingThemes.push({
+          date: formattedDate,
+          theme: quiz.themeName,
+          description: quiz.themeDescription
+        });
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      upcomingThemes
+    });
+  } catch (error) {
+    console.error('Get upcoming themes error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching upcoming themes',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -260,6 +338,7 @@ exports.resetDailyQuiz = async (req, res) => {
     // Reset user's daily quiz stats
     req.user.dailyQuiz.questionsAnswered = 0;
     req.user.dailyQuiz.correctAnswers = 0;
+    req.user.dailyQuiz.score = 0;
     await req.user.save();
     
     res.status(200).json({
@@ -272,6 +351,107 @@ exports.resetDailyQuiz = async (req, res) => {
       success: false,
       message: 'Error resetting daily quiz',
       error: error.message
+    });
+  }
+};
+
+// Admin: Create a new category
+exports.createCategory = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+    
+    const { name, description, icon, color, order } = req.body;
+    
+    // Check if category already exists
+    const existingCategory = await Category.findOne({ name });
+    if (existingCategory) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category already exists'
+      });
+    }
+    
+    // Create new category
+    const category = await Category.create({
+      name,
+      description,
+      icon,
+      color,
+      order: order || 0,
+      active: true
+    });
+    
+    res.status(201).json({
+      success: true,
+      category
+    });
+  } catch (error) {
+    console.error('Create category error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating category',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Admin: Schedule a theme for a specific date
+exports.scheduleTheme = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+    
+    const { date, themeId, questionCount } = req.body;
+    
+    // Validate date
+    if (!date || !moment(date, 'YYYY-MM-DD', true).isValid()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format. Use YYYY-MM-DD'
+      });
+    }
+    
+    // Validate themeId
+    if (!themeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Theme ID is required'
+      });
+    }
+    
+    // Create quiz with specified theme
+    const quiz = await DailyQuiz.createQuizWithTheme(
+      date, 
+      themeId, 
+      questionCount || 10
+    );
+    
+    res.status(201).json({
+      success: true,
+      quiz: {
+        date: quiz.date,
+        theme: quiz.themeName,
+        description: quiz.themeDescription,
+        questionCount: quiz.questions.length
+      }
+    });
+  } catch (error) {
+    console.error('Schedule theme error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error scheduling theme',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

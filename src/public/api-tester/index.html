@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text The Answer API Tester</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Text The Answer API Tester</h1>
+            <p>Test the backend APIs for the Text The Answer trivia application</p>
+        </header>
+
+        <div class="auth-section">
+            <h2>Authentication</h2>
+            <div class="token-display">
+                <label for="auth-token">Auth Token:</label>
+                <input type="text" id="auth-token" readonly>
+                <button id="copy-token">Copy</button>
+                <button id="clear-token">Clear</button>
+            </div>
+            
+            <div class="demo-users">
+                <h3>Demo Users</h3>
+                <div class="demo-buttons">
+                    <button id="demo-free" class="demo-btn free">Free Tier Demo</button>
+                    <button id="demo-premium" class="demo-btn premium">Premium Tier Demo</button>
+                    <button id="demo-education" class="demo-btn education">Education Tier Demo</button>
+                </div>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="register">Register</button>
+                <button class="tab-btn" data-tab="login">Login</button>
+                <button class="tab-btn" data-tab="apple">Apple Login</button>
+                <button class="tab-btn" data-tab="logout">Logout</button>
+            </div>
+
+            <div class="tab-content">
+                <div id="register" class="tab-pane active">
+                    <h3>Register New User</h3>
+                    <form id="register-form">
+                        <div class="form-group">
+                            <label for="register-email">Email:</label>
+                            <input type="email" id="register-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password">Password:</label>
+                            <input type="password" id="register-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-name">Name:</label>
+                            <input type="text" id="register-name" required>
+                        </div>
+                        <div class="form-group checkbox">
+                            <input type="checkbox" id="register-student">
+                            <label for="register-student">Register as Student</label>
+                        </div>
+                        <div id="student-fields" class="hidden">
+                            <div class="form-group">
+                                <label for="student-email">Student Email (.edu):</label>
+                                <input type="email" id="student-email">
+                            </div>
+                            <div class="form-group">
+                                <label for="year-of-study">Year of Study (1-7):</label>
+                                <input type="number" id="year-of-study" min="1" max="7">
+                            </div>
+                        </div>
+                        <button type="submit">Register</button>
+                    </form>
+                </div>
+
+                <div id="login" class="tab-pane">
+                    <h3>Login</h3>
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="login-email">Email:</label>
+                            <input type="email" id="login-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password:</label>
+                            <input type="password" id="login-password" required>
+                        </div>
+                        <button type="submit">Login</button>
+                    </form>
+                </div>
+
+                <div id="apple" class="tab-pane">
+                    <h3>Apple Login (Simulation)</h3>
+                    <form id="apple-form">
+                        <div class="form-group">
+                            <label for="apple-id">Apple ID:</label>
+                            <input type="text" id="apple-id" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="apple-email">Email:</label>
+                            <input type="email" id="apple-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="apple-name">Name:</label>
+                            <input type="text" id="apple-name">
+                        </div>
+                        <button type="submit">Simulate Apple Login</button>
+                    </form>
+                </div>
+
+                <div id="logout" class="tab-pane">
+                    <h3>Logout</h3>
+                    <p>Click the button below to logout and invalidate your current token.</p>
+                    <button id="logout-btn">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="api-section">
+            <h2>API Testing</h2>
+            
+            <div class="api-tabs">
+                <button class="tab-btn active" data-tab="profile">Profile</button>
+                <button class="tab-btn" data-tab="daily-quiz">Daily Quiz</button>
+                <button class="tab-btn" data-tab="multiplayer">Multiplayer</button>
+                <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
+                <button class="tab-btn" data-tab="subscription">Subscription</button>
+                <button class="tab-btn" data-tab="study">Study Materials</button>
+            </div>
+
+            <div class="tab-content">
+                <div id="profile" class="tab-pane active">
+                    <h3>User Profile</h3>
+                    <button id="get-profile">Get Profile</button>
+                    <div class="form-group">
+                        <h4>Update Profile</h4>
+                        <form id="update-profile-form">
+                            <div class="form-group">
+                                <label for="update-name">Name:</label>
+                                <input type="text" id="update-name">
+                            </div>
+                            <div class="form-group">
+                                <label for="update-bio">Bio:</label>
+                                <textarea id="update-bio"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="update-location">Location:</label>
+                                <input type="text" id="update-location">
+                            </div>
+                            <button type="submit">Update Profile</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="daily-quiz" class="tab-pane">
+                    <h3>Daily Quiz</h3>
+                    <button id="get-daily-questions">Get Daily Questions</button>
+                    
+                    <div id="questions-container" class="hidden">
+                        <h4>Available Questions</h4>
+                        <div class="questions-list" id="questions-list">
+                            <!-- Questions will be populated here dynamically -->
+                            <p class="no-questions">No questions loaded yet. Click "Get Daily Questions" first.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <h4>Submit Answer</h4>
+                        <form id="submit-answer-form">
+                            <div class="form-group">
+                                <label for="question-select">Select Question:</label>
+                                <select id="question-select" required>
+                                    <option value="">-- Select a question --</option>
+                                </select>
+                            </div>
+                            <div class="form-group question-display">
+                                <div id="selected-question-text">No question selected</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="answer">Your Answer:</label>
+                                <input type="text" id="answer" required>
+                            </div>
+                            <button type="submit">Submit Answer</button>
+                        </form>
+                    </div>
+                    <button id="get-daily-leaderboard">Get Daily Leaderboard</button>
+                </div>
+
+                <div id="multiplayer" class="tab-pane">
+                    <h3>Multiplayer Game</h3>
+                    <div class="premium-feature">
+                        <p>⭐ Premium Feature</p>
+                    </div>
+                    <div class="form-group">
+                        <h4>Create Lobby</h4>
+                        <form id="create-lobby-form">
+                            <div class="form-group">
+                                <label for="lobby-name">Lobby Name:</label>
+                                <input type="text" id="lobby-name" required>
+                            </div>
+                            <div class="form-group checkbox">
+                                <input type="checkbox" id="lobby-public" checked>
+                                <label for="lobby-public">Public Lobby</label>
+                            </div>
+                            <div class="form-group">
+                                <label for="max-players">Max Players:</label>
+                                <input type="number" id="max-players" min="2" max="10" value="5">
+                            </div>
+                            <button type="submit">Create Lobby</button>
+                        </form>
+                    </div>
+                    <button id="get-lobbies">Get Public Lobbies</button>
+                    <div class="form-group">
+                        <h4>Join Lobby</h4>
+                        <form id="join-lobby-form">
+                            <div class="form-group">
+                                <label for="lobby-code">Lobby Code:</label>
+                                <input type="text" id="lobby-code" required>
+                            </div>
+                            <button type="submit">Join Lobby</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="leaderboard" class="tab-pane">
+                    <h3>Leaderboard</h3>
+                    <button id="get-leaderboard">Get Daily Leaderboard</button>
+                    <div class="form-group">
+                        <h4>Get Game Leaderboard</h4>
+                        <form id="game-leaderboard-form">
+                            <div class="form-group">
+                                <label for="game-id">Game ID:</label>
+                                <input type="text" id="game-id" required>
+                            </div>
+                            <button type="submit">Get Game Leaderboard</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="subscription" class="tab-pane">
+                    <h3>Subscription</h3>
+                    <button id="get-subscription">Get Subscription Details</button>
+                    <button id="create-checkout">Create Checkout Session (Mock)</button>
+                    <button id="cancel-subscription">Cancel Subscription</button>
+                </div>
+
+                <div id="study" class="tab-pane">
+                    <h3>Study Materials</h3>
+                    <div class="education-feature">
+                        <p>🎓 Education Tier Feature</p>
+                    </div>
+                    <div class="form-group">
+                        <h4>Upload Study Material (Simulation)</h4>
+                        <form id="upload-material-form">
+                            <div class="form-group">
+                                <label for="material-title">Title:</label>
+                                <input type="text" id="material-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="material-subject">Subject:</label>
+                                <input type="text" id="material-subject" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="material-content">Content (sample text):</label>
+                                <textarea id="material-content" rows="5" required></textarea>
+                            </div>
+                            <button type="submit">Upload Material</button>
+                        </form>
+                    </div>
+                    <button id="get-materials">Get My Study Materials</button>
+                    <div class="form-group">
+                        <h4>Generate Questions</h4>
+                        <form id="generate-questions-form">
+                            <div class="form-group">
+                                <label for="material-id">Material ID:</label>
+                                <input type="text" id="material-id" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="question-count">Number of Questions:</label>
+                                <input type="number" id="question-count" min="1" max="20" value="5">
+                            </div>
+                            <button type="submit">Generate Questions</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="response-section">
+            <h2>Response</h2>
+            <div class="response-container">
+                <pre id="response-display">No response yet. Use the API endpoints above to test.</pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

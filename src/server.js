@@ -20,6 +20,7 @@ const subscriptionMockRoutes = require('./routes/subscription.mock.routes');
 const studyMaterialRoutes = require('./routes/studyMaterial.routes');
 const demoRoutes = require('./routes/demo.routes');
 const profileRoutes = require('./routes/profile.routes');
+const apiTesterRoutes = require('./routes/api-tester.routes');
 
 // Initialize Express app
 const app = express();
@@ -31,26 +32,31 @@ const io = socketIo(server, {
   }
 });
 
-// Connect to MongoDB
-connectDB()
+// Import database retry utility
+const { connectWithRetry } = require('./utils/database.retry');
+
+// Connect to MongoDB with retry mechanism
+connectWithRetry(connectDB)
   .then(() => {
-    console.log('Database connection established successfully');
+    logger.info('Database connection established successfully');
     
     // Initialize database with seed data after connection is established
     seedQuestions()
-      .then(() => console.log('Database seeding completed'))
-      .catch(err => console.error('Error seeding database:', err));
+      .then(() => logger.info('Database seeding completed'))
+      .catch(err => logger.error('Error seeding database:', err));
       
     // Schedule daily tasks after connection is established
     scheduleDailyTasks();
   })
   .catch(err => {
-    console.error('Failed to connect to the database. Server will continue without seeding:', err);
+    logger.error('Failed to connect to the database after multiple attempts:', err);
+    logger.warn('Server will continue without database connection. Some features may not work properly.');
   });
 
 // Import utilities and services
 const { seedQuestions } = require('./utils/database.utils');
 const { scheduleDailyTasks } = require('./services/scheduler.service');
+const logger = require('./utils/logger');
 
 // Import Swagger documentation
 require('./docs/auth.swagger');
@@ -150,6 +156,7 @@ app.use('/api/mock-subscription', subscriptionMockRoutes);
 app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api-tester', apiTesterRoutes);
 
 // Socket.IO setup
 // Initialize socket handlers
