@@ -1,10 +1,15 @@
 const User = require('../models/user.model');
-const { generateToken } = require('../utils/jwt.utils');
+const { generateToken, blacklistToken } = require('../utils/jwt.utils');
 const emailService = require('../services/email.service');
 const bcrypt = require('bcrypt');
 const logger = require('../utils/logger');
+const crypto = require('crypto');
 
-// Register a new user
+/**
+ * Register a new user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.register = async (req, res) => {
   try {
     const { email, password, name, isStudent, studentEmail, yearOfStudy } = req.body;
@@ -89,13 +94,16 @@ exports.register = async (req, res) => {
     logger.error('Registration error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error registering user',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error registering user'
     });
   }
 };
 
-// Login user
+/**
+ * Login user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -149,13 +157,16 @@ exports.login = async (req, res) => {
     logger.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error logging in',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error logging in'
     });
   }
 };
 
-// Get user profile
+/**
+ * Get user profile
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -190,18 +201,27 @@ exports.getProfile = async (req, res) => {
     logger.error('Get profile error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching user profile',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error fetching user profile'
     });
   }
 };
 
-// Apple OAuth callback
+/**
+ * Apple OAuth callback
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.appleCallback = async (req, res) => {
   try {
-    // This would be handled by Supabase in the actual implementation
-    // Here we're just creating a placeholder for the integration
     const { appleId, email, name } = req.body;
+    
+    if (!appleId || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Apple ID and email are required'
+      });
+    }
+    
     logger.info(`Apple OAuth callback received for email: ${email}`);
 
     // Check if user already exists with this Apple ID
@@ -221,7 +241,7 @@ exports.appleCallback = async (req, res) => {
         logger.info(`Creating new user via Apple OAuth: ${email}`);
         user = new User({
           email,
-          name,
+          name: name || email.split('@')[0], // Use part of email as name if not provided
           appleId
         });
         await user.save();
@@ -247,33 +267,71 @@ exports.appleCallback = async (req, res) => {
     logger.error('Apple OAuth error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error with Apple authentication',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error with Apple authentication'
     });
   }
 };
 
-// Logout (just a placeholder as JWT is stateless)
+/**
+ * Logout user by blacklisting the token
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.logout = (req, res) => {
-  // In a real implementation, you might want to blacklist the token
-  // or implement a token revocation mechanism
-  logger.info(`Logout request from user ID: ${req.user.id}`);
-  res.status(200).json({
-    success: true,
-    message: 'Logged out successfully'
-  });
+  try {
+    // Blacklist the token
+    const token = req.token;
+    const success = blacklistToken(token);
+    
+    if (!success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error logging out'
+      });
+    }
+    
+    logger.info(`User logged out: ${req.user.id}`);
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    logger.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error logging out'
+    });
+  }
 };
 
-// Verify student email
+/**
+ * Verify student email
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.verifyStudentEmail = async (req, res) => {
   try {
     const { token } = req.params;
     
-    // In a real implementation, this would validate a verification token
-    // Here we're just simulating the verification process
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token is required'
+      });
+    }
     
-    // Decode the token to get the user ID (this is simplified)
-    const userId = token.split('_')[0]; // Just an example of token format
+    // In a real implementation, this would validate a verification token
+    // Here we're implementing a more secure version
+    
+    // Split the token to get the user ID and verification code
+    const [userId, verificationCode] = token.split('_');
+    
+    if (!userId || !verificationCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification token format'
+      });
+    }
     
     const user = await User.findById(userId);
     if (!user || !user.education || !user.education.isStudent) {
@@ -282,6 +340,9 @@ exports.verifyStudentEmail = async (req, res) => {
         message: 'Invalid verification token'
       });
     }
+    
+    // In a real implementation, we would verify the code against a stored value
+    // For now, we'll simulate verification
     
     // Update verification status
     user.education.verificationStatus = 'verified';
@@ -301,136 +362,233 @@ exports.verifyStudentEmail = async (req, res) => {
     logger.error('Verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error verifying student email',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error verifying student email'
     });
   }
 };
 
 /**
- * Create a demo user with all access features
+ * Create a demo user with premium tier access
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 exports.createDemoUser = async (req, res) => {
     try {
         // Check if demo user already exists
-        const existingUser = await User.findOne({ email: 'demouser@gmail.com' });
+        const existingUser = await User.findOne({ email: 'demo-premium@texttheanswer.com' });
         
         if (existingUser) {
             // Return the existing demo user
-            const token = generateToken(existingUser);
+            const token = generateToken(existingUser._id);
             return res.status(200).json({
                 success: true,
-                message: 'Demo user logged in',
+                message: 'Premium demo user logged in',
                 token,
                 user: {
                     id: existingUser._id,
                     name: existingUser.name,
                     email: existingUser.email,
-                    role: existingUser.role,
                     subscription: existingUser.subscription
                 }
             });
         }
         
+        // Generate a secure random password
+        const demoPassword = crypto.randomBytes(12).toString('hex');
+        
         // Create a new demo user
         const newUser = new User({
-            name: 'Demo User',
-            email: 'demouser@gmail.com',
-            password: await bcrypt.hash('murewa20june2007', 10),
-            isVerified: true,
-            role: 'premium',
+            name: 'Premium Demo User',
+            email: 'demo-premium@texttheanswer.com',
+            password: await bcrypt.hash(demoPassword, 10),
             subscription: {
                 status: 'premium',
-                since: new Date(),
-                features: ['all_access', 'education', 'premium_content']
+                stripeCustomerId: 'demo_customer_premium',
+                currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+                freeTrialUsed: true
+            },
+            stats: {
+                streak: 5,
+                lastPlayed: new Date(),
+                totalCorrect: 150,
+                totalAnswered: 200
             }
         });
         
         await newUser.save();
         
         // Generate JWT token
-        const token = generateToken(newUser);
+        const token = generateToken(newUser._id);
         
         res.status(201).json({
             success: true,
-            message: 'Demo user created successfully',
+            message: 'Premium demo user created successfully',
             token,
             user: {
                 id: newUser._id,
                 name: newUser.name,
                 email: newUser.email,
-                role: newUser.role,
-                subscription: newUser.subscription
+                subscription: newUser.subscription,
+                isPremium: true
             }
         });
     } catch (error) {
-        logger.error('Error creating demo user:', error);
-        res.status(500).json({ success: false, message: 'Error creating demo user', error: error.message });
+        logger.error('Error creating premium demo user:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error creating premium demo user' 
+        });
     }
 };
 
 /**
- * Create a second demo user with all access features
+ * Create a free tier demo user
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-exports.createDemoUser2 = async (req, res) => {
+exports.createFreeDemoUser = async (req, res) => {
     try {
         // Check if demo user already exists
-        const existingUser = await User.findOne({ email: 'demouser2@gmail.com' });
+        const existingUser = await User.findOne({ email: 'demo-free@texttheanswer.com' });
         
         if (existingUser) {
             // Return the existing demo user
-            const token = generateToken(existingUser);
+            const token = generateToken(existingUser._id);
             return res.status(200).json({
                 success: true,
-                message: 'Demo user 2 logged in',
+                message: 'Free demo user logged in',
                 token,
                 user: {
                     id: existingUser._id,
                     name: existingUser.name,
                     email: existingUser.email,
-                    role: existingUser.role,
                     subscription: existingUser.subscription
                 }
             });
         }
         
+        // Generate a secure random password
+        const demoPassword = crypto.randomBytes(12).toString('hex');
+        
         // Create a new demo user
         const newUser = new User({
-            name: 'Demo User 2',
-            email: 'demouser2@gmail.com',
-            password: await bcrypt.hash('murewa20june2007', 10),
-            isVerified: true,
-            role: 'education',
+            name: 'Free Demo User',
+            email: 'demo-free@texttheanswer.com',
+            password: await bcrypt.hash(demoPassword, 10),
             subscription: {
-                status: 'education',
-                since: new Date(),
-                features: ['all_access', 'education', 'premium_content']
+                status: 'free'
+            },
+            stats: {
+                streak: 2,
+                lastPlayed: new Date(),
+                totalCorrect: 45,
+                totalAnswered: 70
             }
         });
         
         await newUser.save();
         
         // Generate JWT token
-        const token = generateToken(newUser);
+        const token = generateToken(newUser._id);
         
         res.status(201).json({
             success: true,
-            message: 'Demo user 2 created successfully',
+            message: 'Free demo user created successfully',
             token,
             user: {
                 id: newUser._id,
                 name: newUser.name,
                 email: newUser.email,
-                role: newUser.role,
-                subscription: newUser.subscription
+                subscription: newUser.subscription,
+                isPremium: false
             }
         });
     } catch (error) {
-        logger.error('Error creating demo user 2:', error);
-        res.status(500).json({ success: false, message: 'Error creating demo user 2', error: error.message });
+        logger.error('Error creating free demo user:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error creating free demo user' 
+        });
+    }
+};
+
+/**
+ * Create an education tier demo user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.createEducationDemoUser = async (req, res) => {
+    try {
+        // Check if demo user already exists
+        const existingUser = await User.findOne({ email: 'demo-education@texttheanswer.com' });
+        
+        if (existingUser) {
+            // Return the existing demo user
+            const token = generateToken(existingUser._id);
+            return res.status(200).json({
+                success: true,
+                message: 'Education demo user logged in',
+                token,
+                user: {
+                    id: existingUser._id,
+                    name: existingUser.name,
+                    email: existingUser.email,
+                    subscription: existingUser.subscription
+                }
+            });
+        }
+        
+        // Generate a secure random password
+        const demoPassword = crypto.randomBytes(12).toString('hex');
+        
+        // Create a new demo user
+        const newUser = new User({
+            name: 'Education Demo User',
+            email: 'demo-education@texttheanswer.com',
+            password: await bcrypt.hash(demoPassword, 10),
+            subscription: {
+                status: 'education',
+                stripeCustomerId: 'demo_customer_education',
+                currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+            },
+            education: {
+                isStudent: true,
+                studentEmail: 'student@university.edu',
+                yearOfStudy: 3,
+                verificationStatus: 'verified'
+            },
+            stats: {
+                streak: 7,
+                lastPlayed: new Date(),
+                totalCorrect: 200,
+                totalAnswered: 250
+            }
+        });
+        
+        await newUser.save();
+        
+        // Generate JWT token
+        const token = generateToken(newUser._id);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Education demo user created successfully',
+            token,
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                subscription: newUser.subscription,
+                education: newUser.education,
+                isPremium: true,
+                isEducation: true
+            }
+        });
+    } catch (error) {
+        logger.error('Error creating education demo user:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error creating education demo user' 
+        });
     }
 };

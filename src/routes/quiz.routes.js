@@ -1,18 +1,40 @@
 const express = require('express');
 const router = express.Router();
 const quizController = require('../controllers/quiz.controller');
-const { authenticate, requirePremium } = require('../middleware/auth.middleware');
+const authMiddleware = require('../middleware/auth.middleware');
 
-// Get today's quiz questions (protected route)
-router.get('/daily', authenticate, quizController.getDailyQuestions);
+// Public routes
+// None
 
-// Submit answer for daily quiz (protected route)
-router.post('/daily/submit', authenticate, quizController.submitAnswer);
+// Protected routes - require authentication
+router.get('/daily', authMiddleware.authenticate, quizController.getDailyQuestions);
+router.post('/daily/submit', authMiddleware.authenticate, quizController.submitAnswer);
+router.get('/daily/leaderboard', authMiddleware.authenticate, quizController.getDailyLeaderboard);
+router.get('/categories', authMiddleware.authenticate, quizController.getCategories);
 
-// Get daily quiz leaderboard
-router.get('/daily/leaderboard', authenticate, quizController.getDailyLeaderboard);
+// Premium routes - require premium subscription
+router.get('/upcoming-themes', 
+  authMiddleware.authenticate, 
+  authMiddleware.requirePremium, 
+  quizController.getUpcomingThemes
+);
 
-// Reset daily quiz (development only)
-router.post('/daily/reset', authenticate, quizController.resetDailyQuiz);
+// Admin routes
+router.post('/categories', 
+  authMiddleware.authenticate, 
+  authMiddleware.requireAdmin, 
+  quizController.createCategory
+);
+
+router.post('/schedule-theme', 
+  authMiddleware.authenticate, 
+  authMiddleware.requireAdmin, 
+  quizController.scheduleTheme
+);
+
+// Development routes
+if (process.env.NODE_ENV === 'development') {
+  router.post('/reset', authMiddleware.authenticate, quizController.resetDailyQuiz);
+}
 
 module.exports = router;
