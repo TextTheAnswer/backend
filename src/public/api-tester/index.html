@@ -5,37 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Text The Answer API Tester</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Text The Answer API Tester</h1>
+            <div class="logo-container">
+                <div class="logo">TTA</div>
+                <h1>Text The Answer API Tester</h1>
+            </div>
             <p>Test the backend APIs for the Text The Answer trivia application</p>
+            
+            <!-- Mode Toggle Switch -->
+            <div class="mode-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="mode-toggle-checkbox">
+                    <span class="slider round"></span>
+                </label>
+                <span id="mode-label">Regular User Mode</span>
+            </div>
         </header>
 
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <h2>API Testing Dashboard</h2>
+                <div class="environment-badge" id="environment-badge">Development</div>
+            </div>
+            
+            <div class="status-panel">
+                <div class="status-item">
+                    <span class="status-label">Server Status:</span>
+                    <span class="status-value" id="server-status"><span class="status-indicator online"></span> Online</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">User Tier:</span>
+                    <span class="status-value" id="user-tier">Not logged in</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">API Version:</span>
+                    <span class="status-value">v1.0</span>
+                </div>
+            </div>
+        </div>
+
         <div class="auth-section">
-            <h2>Authentication</h2>
+            <h2><i class="fas fa-lock"></i> Authentication</h2>
             <div class="token-display">
                 <label for="auth-token">Auth Token:</label>
                 <input type="text" id="auth-token" readonly>
-                <button id="copy-token">Copy</button>
-                <button id="clear-token">Clear</button>
+                <button id="copy-token" class="icon-btn"><i class="fas fa-copy"></i> Copy</button>
+                <button id="clear-token" class="icon-btn danger"><i class="fas fa-trash"></i> Clear</button>
             </div>
             
             <div class="demo-users">
-                <h3>Demo Users</h3>
+                <h3><i class="fas fa-user-plus"></i> Demo Users</h3>
                 <div class="demo-buttons">
-                    <button id="demo-free" class="demo-btn free">Free Tier Demo</button>
-                    <button id="demo-premium" class="demo-btn premium">Premium Tier Demo</button>
-                    <button id="demo-education" class="demo-btn education">Education Tier Demo</button>
+                    <button id="demo-free" class="demo-btn free"><i class="fas fa-user"></i> Free Tier Demo</button>
+                    <button id="demo-premium" class="demo-btn premium"><i class="fas fa-crown"></i> Premium Tier Demo</button>
+                    <button id="demo-education" class="demo-btn education"><i class="fas fa-graduation-cap"></i> Education Tier Demo</button>
                 </div>
             </div>
 
             <div class="auth-tabs">
-                <button class="tab-btn active" data-tab="register">Register</button>
-                <button class="tab-btn" data-tab="login">Login</button>
-                <button class="tab-btn" data-tab="apple">Apple Login</button>
-                <button class="tab-btn" data-tab="logout">Logout</button>
+                <button class="tab-btn active" data-tab="register"><i class="fas fa-user-plus"></i> Register</button>
+                <button class="tab-btn" data-tab="login"><i class="fas fa-sign-in-alt"></i> Login</button>
+                <button class="tab-btn" data-tab="apple"><i class="fab fa-apple"></i> Apple Login</button>
+                <button class="tab-btn" data-tab="logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
 
             <div class="tab-content">
@@ -68,7 +103,7 @@
                                 <input type="number" id="year-of-study" min="1" max="7">
                             </div>
                         </div>
-                        <button type="submit">Register</button>
+                        <button type="submit" class="btn-primary"><i class="fas fa-user-plus"></i> Register</button>
                     </form>
                 </div>
 
@@ -83,7 +118,7 @@
                             <label for="login-password">Password:</label>
                             <input type="password" id="login-password" required>
                         </div>
-                        <button type="submit">Login</button>
+                        <button type="submit" class="btn-primary"><i class="fas fa-sign-in-alt"></i> Login</button>
                     </form>
                 </div>
 
@@ -102,34 +137,34 @@
                             <label for="apple-name">Name:</label>
                             <input type="text" id="apple-name">
                         </div>
-                        <button type="submit">Simulate Apple Login</button>
+                        <button type="submit" class="btn-primary"><i class="fab fa-apple"></i> Simulate Apple Login</button>
                     </form>
                 </div>
 
                 <div id="logout" class="tab-pane">
                     <h3>Logout</h3>
                     <p>Click the button below to logout and invalidate your current token.</p>
-                    <button id="logout-btn">Logout</button>
+                    <button id="logout-btn" class="btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
                 </div>
             </div>
         </div>
 
         <div class="api-section">
-            <h2>API Testing</h2>
+            <h2><i class="fas fa-code"></i> API Testing</h2>
             
             <div class="api-tabs">
-                <button class="tab-btn active" data-tab="profile">Profile</button>
-                <button class="tab-btn" data-tab="daily-quiz">Daily Quiz</button>
-                <button class="tab-btn" data-tab="multiplayer">Multiplayer</button>
-                <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
-                <button class="tab-btn" data-tab="subscription">Subscription</button>
-                <button class="tab-btn" data-tab="study">Study Materials</button>
+                <button class="tab-btn active" data-tab="profile"><i class="fas fa-user-circle"></i> Profile</button>
+                <button class="tab-btn" data-tab="daily-quiz"><i class="fas fa-question-circle"></i> Daily Quiz</button>
+                <button class="tab-btn" data-tab="multiplayer"><i class="fas fa-users"></i> Multiplayer</button>
+                <button class="tab-btn" data-tab="leaderboard"><i class="fas fa-trophy"></i> Leaderboard</button>
+                <button class="tab-btn" data-tab="subscription"><i class="fas fa-credit-card"></i> Subscription</button>
+                <button class="tab-btn" data-tab="study"><i class="fas fa-book"></i> Study Materials</button>
             </div>
 
             <div class="tab-content">
                 <div id="profile" class="tab-pane active">
                     <h3>User Profile</h3>
-                    <button id="get-profile">Get Profile</button>
+                    <button id="get-profile" class="btn-primary"><i class="fas fa-user-circle"></i> Get Profile</button>
                     <div class="form-group">
                         <h4>Update Profile</h4>
                         <form id="update-profile-form">
@@ -145,17 +180,21 @@
                                 <label for="update-location">Location:</label>
                                 <input type="text" id="update-location">
                             </div>
-                            <button type="submit">Update Profile</button>
+                            <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Update Profile</button>
                         </form>
                     </div>
                 </div>
 
                 <div id="daily-quiz" class="tab-pane">
                     <h3>Daily Quiz</h3>
-                    <button id="get-daily-questions">Get Daily Questions</button>
+                    <button id="get-daily-questions" class="btn-primary"><i class="fas fa-sync"></i> Get Daily Questions</button>
                     
                     <div id="questions-container" class="hidden">
-                        <h4>Available Questions</h4>
+                        <h4><i class="fas fa-list"></i> Available Questions</h4>
+                        <div class="theme-info" id="theme-info">
+                            <div class="theme-badge" id="theme-badge">Sports</div>
+                            <p id="theme-description">Today's theme is Sports</p>
+                        </div>
                         <div class="questions-list" id="questions-list">
                             <!-- Questions will be populated here dynamically -->
                             <p class="no-questions">No questions loaded yet. Click "Get Daily Questions" first.</p>
@@ -163,7 +202,7 @@
                     </div>
                     
                     <div class="form-group">
-                        <h4>Submit Answer</h4>
+                        <h4><i class="fas fa-paper-plane"></i> Submit Answer</h4>
                         <form id="submit-answer-form">
                             <div class="form-group">
                                 <label for="question-select">Select Question:</label>
@@ -178,19 +217,19 @@
                                 <label for="answer">Your Answer:</label>
                                 <input type="text" id="answer" required>
                             </div>
-                            <button type="submit">Submit Answer</button>
+                            <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Submit Answer</button>
                         </form>
                     </div>
-                    <button id="get-daily-leaderboard">Get Daily Leaderboard</button>
+                    <button id="get-daily-leaderboard" class="btn-primary"><i class="fas fa-trophy"></i> Get Daily Leaderboard</button>
                 </div>
 
                 <div id="multiplayer" class="tab-pane">
                     <h3>Multiplayer Game</h3>
                     <div class="premium-feature">
-                        <p>⭐ Premium Feature</p>
+                        <p><i class="fas fa-crown"></i> Premium Feature</p>
                     </div>
                     <div class="form-group">
-                        <h4>Create Lobby</h4>
+                        <h4><i class="fas fa-plus-circle"></i> Create Lobby</h4>
                         <form id="create-lobby-form">
                             <div class="form-group">
                                 <label for="lobby-name">Lobby Name:</label>
@@ -204,51 +243,51 @@
                                 <label for="max-players">Max Players:</label>
                                 <input type="number" id="max-players" min="2" max="10" value="5">
                             </div>
-                            <button type="submit">Create Lobby</button>
+                            <button type="submit" class="btn-primary"><i class="fas fa-plus-circle"></i> Create Lobby</button>
                         </form>
                     </div>
-                    <button id="get-lobbies">Get Public Lobbies</button>
+                    <button id="get-lobbies" class="btn-primary"><i class="fas fa-list"></i> Get Public Lobbies</button>
                     <div class="form-group">
-                        <h4>Join Lobby</h4>
+                        <h4><i class="fas fa-sign-in-alt"></i> Join Lobby</h4>
                         <form id="join-lobby-form">
                             <div class="form-group">
                                 <label for="lobby-code">Lobby Code:</label>
                                 <input type="text" id="lobby-code" required>
                             </div>
-                            <button type="submit">Join Lobby</button>
+                            <button type="submit" class="btn-primary"><i class="fas fa-sign-in-alt"></i> Join Lobby</button>
                         </form>
                     </div>
                 </div>
 
                 <div id="leaderboard" class="tab-pane">
                     <h3>Leaderboard</h3>
-                    <button id="get-leaderboard">Get Daily Leaderboard</button>
+                    <button id="get-leaderboard" class="btn-primary"><i class="fas fa-trophy"></i> Get Daily Leaderboard</button>
                     <div class="form-group">
-                        <h4>Get Game Leaderboard</h4>
+                        <h4><i class="fas fa-gamepad"></i> Get Game Leaderboard</h4>
                         <form id="game-leaderboard-form">
                             <div class="form-group">
                                 <label for="game-id">Game ID:</label>
                                 <input type="text" id="game-id" required>
                             </div>
-                            <button type="submit">Get Game Leaderboard</button>
+                            <button type="submit" class="btn-primary"><i class="fas fa-search"></i> Get Game Leaderboard</button>
                         </form>
                     </div>
                 </div>
 
                 <div id="subscription" class="tab-pane">
                     <h3>Subscription</h3>
-                    <button id="get-subscription">Get Subscription Details</button>
-                    <button id="create-checkout">Create Checkout Session (Mock)</button>
-                    <button id="cancel-subscription">Cancel Subscription</button>
+                    <button id="get-subscription" class="btn-primary"><i class="fas fa-info-circle"></i> Get Subscription Details</button>
+                    <button id="create-checkout" class="btn-primary"><i class="fas fa-shopping-cart"></i> Create Checkout Session (Mock)</button>
+                    <button id="cancel-subscription" class="btn-danger"><i class="fas fa-times-circle"></i> Cancel Subscription</button>
                 </div>
 
                 <div id="study" class="tab-pane">
                     <h3>Study Materials</h3>
                     <div class="education-feature">
-                        <p>🎓 Education Tier Feature</p>
+                        <p><i class="fas fa-graduation-cap"></i> Education Tier Feature</p>
                     </div>
                     <div class="form-group">
-                        <h4>Upload Study Material (Simulation)</h4>
+                        <h4><i class="fas fa-upload"></i> Upload Study Material (Simulation)</h4>
                         <form id="upload-material-form">
                             <div class="form-group">
                                 <label for="material-title">Title:</label>
@@ -262,12 +301,12 @@
                                 <label for="material-content">Content (sample text):</label>
                                 <textarea id="material-content" rows="5" required></textarea>
                             </div>
-                            <button type="submit">Upload Material</button>
+                            <button type="submit" class="btn-primary"><i class="fas fa-upload"></i> Upload Material</button>
                         </form>
                     </div>
-                    <button id="get-materials">Get My Study Materials</button>
+                    <button id="get-materials" class="btn-primary"><i class="fas fa-books"></i> Get My Study Materials</button>
                     <div class="form-group">
-                        <h4>Generate Questions</h4>
+                        <h4><i class="fas fa-magic"></i> Generate Questions</h4>
                         <form id="generate-questions-form">
                             <div class="form-group">
                                 <label for="material-id">Material ID:</label>
@@ -277,7 +316,7 @@
                                 <label for="question-count">Number of Questions:</label>
                                 <input type="number" id="question-count" min="1" max="20" value="5">
                             </div>
-                            <button type="submit">Generate Questions</button>
+                            <button type="submit" class="btn-primary"><i class="fas fa-magic"></i> Generate Questions</button>
                         </form>
                     </div>
                 </div>
@@ -285,11 +324,35 @@
         </div>
 
         <div class="response-section">
-            <h2>Response</h2>
+            <div class="response-header">
+                <h2><i class="fas fa-terminal"></i> Response</h2>
+                <div class="response-controls">
+                    <button id="clear-response" class="icon-btn small"><i class="fas fa-eraser"></i> Clear</button>
+                    <button id="copy-response" class="icon-btn small"><i class="fas fa-copy"></i> Copy</button>
+                </div>
+            </div>
             <div class="response-container">
                 <pre id="response-display">No response yet. Use the API endpoints above to test.</pre>
             </div>
         </div>
+        
+        <footer>
+            <p>Text The Answer API Tester v1.0 | <span id="current-date"></span></p>
+            <div class="dev-info" id="dev-panel">
+                <div class="dev-info-item">
+                    <span class="dev-label">Request Count:</span>
+                    <span class="dev-value" id="request-count">0</span>
+                </div>
+                <div class="dev-info-item">
+                    <span class="dev-label">Last Request:</span>
+                    <span class="dev-value" id="last-request-time">N/A</span>
+                </div>
+                <div class="dev-info-item">
+                    <span class="dev-label">Response Time:</span>
+                    <span class="dev-value" id="response-time">N/A</span>
+                </div>
+            </div>
+        </footer>
     </div>
 
     <script src="script.js"></script>
