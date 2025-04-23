@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
-const { authenticate } = require('../middleware/auth.middleware');
+const { authenticate, rateLimitAuth } = require('../middleware/auth.middleware');
 const { validateLogin, validateRegister } = require('../middleware/validation.middleware');
+
+// Apply rate limiting to authentication routes
+router.use(rateLimitAuth);
 
 // Register new user
 router.post('/register', validateRegister, authController.register);
@@ -23,7 +26,8 @@ router.post('/logout', authenticate, authController.logout);
 router.get('/verify-student/:token', authController.verifyStudentEmail);
 
 // Demo user routes
-router.post('/create-demo-user', authController.createDemoUser);
-router.post('/create-demo-user2', authController.createDemoUser2);
+router.post('/demo/premium', authController.createDemoUser);
+router.post('/demo/free', authController.createFreeDemoUser);
+router.post('/demo/education', authController.createEducationDemoUser);
 
 module.exports = router;
