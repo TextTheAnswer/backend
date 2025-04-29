@@ -28,7 +28,7 @@ exports.getDailyQuestions = async (req, res) => {
         text: q.text,
         category: q.category,
         difficulty: q.difficulty,
-        timeLimit: q.timeLimit || 30
+        timeLimit: 15 // Always enforce 15 seconds for daily quiz
       };
 
       // For backward compatibility with old multiple choice questions
@@ -98,8 +98,8 @@ exports.submitAnswer = async (req, res) => {
       isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
     }
     
-    // Check if the answer was submitted within the time limit
-    const timeLimit = question.timeLimit || 30;
+    // Always enforce 15 seconds for daily quiz
+    const timeLimit = 15;
     const withinTimeLimit = !timeSpent || timeSpent <= timeLimit;
     
     // If answer was submitted after time limit, mark it as incorrect
@@ -159,8 +159,11 @@ exports.submitAnswer = async (req, res) => {
     
     await user.save();
     
-    // Update question usage statistics
-    await question.updateUsage();
+    // Update question usage statistics - no need to increment here since it's already done when creating the daily quiz
+    // This ensures question usage is properly tracked even for questions the user doesn't answer
+    // Just update the lastUsed date to ensure accuracy
+    question.lastUsed = new Date();
+    await question.save();
     
     // Update daily quiz leaderboard if needed
     const dailyQuiz = await DailyQuiz.getTodayQuiz();
@@ -196,6 +199,170 @@ exports.submitAnswer = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error submitting answer',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Submit multiple answers in bulk for daily quiz
+exports.submitAnswersBulk = async (req, res) => {
+  try {
+    const { answers } = req.body;
+    const user = req.user;
+    
+    // Validate answers array
+    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid answers format. Expected an array of answers.'
+      });
+    }
+    
+    // Check if user has already completed today's quiz (free tier limitation)
+    if (user.subscription.status === 'free' && 
+        (user.dailyQuiz.questionsAnswered + answers.length) > 10) {
+      return res.status(403).json({
+        success: false,
+        message: 'Free tier users can only answer 10 questions per day. Upgrade to premium for unlimited access.'
+      });
+    }
+    
+    // Get today's quiz
+    const dailyQuiz = await DailyQuiz.getTodayQuiz();
+    const results = [];
+    let totalPoints = 0;
+    
+    // Process all answers
+    for (const answerData of answers) {
+      const { questionId, answer, timeSpent } = answerData;
+      
+      // Find the question
+      const question = await Question.findById(questionId);
+      if (!question) {
+        results.push({
+          questionId,
+          success: false,
+          message: 'Question not found'
+        });
+        continue;
+      }
+      
+      // Check if answer is correct
+      let isCorrect = false;
+      
+      if (question.isMultipleChoice) {
+        // For legacy multiple choice questions
+        isCorrect = parseInt(answer) === question.correctAnswer;
+      } else {
+        // For new free-text questions - perform case-insensitive match
+        const userAnswer = answer.trim().toLowerCase();
+        const correctAnswer = question.correctAnswer.toLowerCase();
+        const alternatives = question.alternativeAnswers.map(alt => alt.toLowerCase());
+        
+        isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
+      }
+      
+      // Always enforce 15 seconds for daily quiz
+      const timeLimit = 15;
+      const withinTimeLimit = !timeSpent || timeSpent <= timeLimit;
+      
+      // If answer was submitted after time limit, mark it as incorrect
+      if (!withinTimeLimit) {
+        isCorrect = false;
+      }
+      
+      // Calculate points based on time spent (faster answers get more points)
+      // Only if answer is correct and within time limit
+      let points = 0;
+      if (isCorrect && withinTimeLimit) {
+        // Base points for correct answer
+        const basePoints = 100;
+        
+        // Time bonus: faster answers get more points
+        // Formula: Bonus = (1 - timeSpent/timeLimit) * 100
+        // This gives a range of 0-100 bonus points
+        const timeBonus = Math.round((1 - (timeSpent / timeLimit)) * 100);
+        
+        // Difficulty multiplier
+        const difficultyMultiplier = 
+          question.difficulty === 'easy' ? 1 :
+          question.difficulty === 'medium' ? 1.5 : 2; // hard = 2x
+        
+        // Calculate total points
+        points = Math.round((basePoints + timeBonus) * difficultyMultiplier);
+        totalPoints += points;
+      }
+      
+      // Update user's daily quiz stats
+      user.dailyQuiz.questionsAnswered += 1;
+      if (isCorrect) {
+        user.dailyQuiz.correctAnswers += 1;
+        user.stats.totalCorrect += 1;
+      }
+      user.stats.totalAnswered += 1;
+      
+      // Update question usage statistics
+      question.lastUsed = new Date();
+      await question.save();
+      
+      // Store result
+      results.push({
+        questionId,
+        isCorrect,
+        points,
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation,
+        withinTimeLimit
+      });
+    }
+    
+    // Update user's score
+    if (!user.dailyQuiz.score) {
+      user.dailyQuiz.score = 0;
+    }
+    user.dailyQuiz.score += totalPoints;
+    
+    // Update streak if needed
+    const today = moment().startOf('day');
+    const lastPlayed = user.stats.lastPlayed ? moment(user.stats.lastPlayed).startOf('day') : null;
+    
+    if (!lastPlayed || !lastPlayed.isSame(today)) {
+      if (lastPlayed && lastPlayed.add(1, 'days').isSame(today)) {
+        // Consecutive day, increase streak
+        user.stats.streak += 1;
+      } else if (!lastPlayed || !lastPlayed.add(1, 'days').isSame(today)) {
+        // Not consecutive, reset streak
+        user.stats.streak = 1;
+      }
+      user.stats.lastPlayed = new Date();
+    }
+    
+    await user.save();
+    
+    // Update daily quiz leaderboard if needed
+    if (user.dailyQuiz.correctAnswers === 10 && 
+        (user.dailyQuiz.score > dailyQuiz.highestScore || !dailyQuiz.winner)) {
+      dailyQuiz.highestScore = user.dailyQuiz.score;
+      dailyQuiz.winner = user._id;
+      await dailyQuiz.save();
+    }
+    
+    res.status(200).json({
+      success: true,
+      results,
+      summary: {
+        questionsAnswered: user.dailyQuiz.questionsAnswered,
+        correctAnswers: user.dailyQuiz.correctAnswers,
+        totalScore: user.dailyQuiz.score || 0,
+        totalPointsEarned: totalPoints,
+        streak: user.stats.streak
+      }
+    });
+  } catch (error) {
+    console.error('Submit answers bulk error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error submitting answers in bulk',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

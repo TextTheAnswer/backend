@@ -31,8 +31,8 @@ const questionSchema = new mongoose.Schema({
   },
   timeLimit: {
     type: Number,
-    default: 30,
-    min: 10,
+    default: 15,
+    min: 15,
     max: 120
   },
   isMultipleChoice: {
@@ -109,8 +109,12 @@ questionSchema.statics.getRandom = async function(limit = 10, excludeCategories 
 
 // Method to update usage statistics when a question is used
 questionSchema.methods.updateUsage = async function() {
+  // Update usage count
   this.usageCount += 1;
+  
+  // Set lastUsed to current date
   this.lastUsed = new Date();
+  
   return this.save();
 };
 
@@ -140,6 +144,37 @@ questionSchema.statics.getByTags = async function(tags, limit = 10) {
     .limit(limit);
   } catch (error) {
     console.error('Error in getByTags:', error);
+    throw error;
+  }
+};
+
+// Static method to get unused questions or least recently used
+questionSchema.statics.getUnusedQuestions = async function(daysAgo = 30, limit = 10, excludeCategories = []) {
+  try {
+    // Calculate the date X days ago
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+    
+    // Base query for approved questions
+    const query = { 
+      isApproved: true,
+      $or: [
+        { lastUsed: { $lt: cutoffDate } },
+        { lastUsed: { $exists: false } }
+      ]
+    };
+    
+    // Add category exclusion if provided
+    if (excludeCategories && excludeCategories.length > 0) {
+      query.category = { $nin: excludeCategories };
+    }
+    
+    // Get questions that haven't been used in the specified days
+    return await this.find(query)
+      .sort({ usageCount: 1, lastUsed: 1 }) // Prioritize least used and oldest used first
+      .limit(limit);
+  } catch (error) {
+    console.error('Error in getUnusedQuestions:', error);
     throw error;
   }
 };

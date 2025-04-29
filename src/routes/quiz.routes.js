@@ -9,6 +9,7 @@ const authMiddleware = require('../middleware/auth.middleware');
 // Protected routes - require authentication
 router.get('/daily', authMiddleware.authenticate, quizController.getDailyQuestions);
 router.post('/daily/submit', authMiddleware.authenticate, quizController.submitAnswer);
+router.post('/daily/submit-bulk', authMiddleware.authenticate, quizController.submitAnswersBulk);
 router.get('/daily/leaderboard', authMiddleware.authenticate, quizController.getDailyLeaderboard);
 router.get('/categories', authMiddleware.authenticate, quizController.getCategories);
 

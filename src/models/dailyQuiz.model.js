@@ -60,39 +60,73 @@ dailyQuizSchema.statics.getTodayQuiz = async function() {
       }
       
       // Select a random category for today's theme
-      // For more control, you could implement a rotation system instead of random selection
       const randomIndex = Math.floor(Math.random() * categories.length);
       const todayTheme = categories[randomIndex];
       
-      // Get 10 questions from today's theme category
-      // If not enough questions in the selected category, get questions from other categories
-      let questions = await Question.find({ 
-        category: todayTheme.name,
-        // Add additional filters if needed (e.g., difficulty level)
-      }).limit(10);
+      // Get unused questions from today's theme category (not used in the last 30 days)
+      let themeQuestions = await Question.getUnusedQuestions(30, 10, []);
+      themeQuestions = themeQuestions.filter(q => q.category === todayTheme.name);
       
-      // If not enough questions in the selected category, get random questions to fill the gap
-      if (questions.length < 10) {
-        const additionalQuestions = await Question.aggregate([
-          { $match: { category: { $ne: todayTheme.name } } },
-          { $sample: { size: 10 - questions.length } }
-        ]);
-        
-        questions = [...questions, ...additionalQuestions];
+      // Limit to 10 questions
+      if (themeQuestions.length > 10) {
+        themeQuestions = themeQuestions.slice(0, 10);
       }
       
-      if (questions.length < 5) {
+      // If not enough theme questions, get questions from other categories
+      const themeQuestionsCount = themeQuestions.length;
+      let remainingQuestions = [];
+      
+      if (themeQuestionsCount < 10) {
+        // Exclude the current theme from the search
+        remainingQuestions = await Question.getUnusedQuestions(30, 10 - themeQuestionsCount, [todayTheme.name]);
+      }
+      
+      // Combine questions
+      let selectedQuestions = [...themeQuestions, ...remainingQuestions];
+      
+      // If still not enough, get any questions that have been used least recently
+      if (selectedQuestions.length < 10) {
+        console.log(`Not enough unused questions available. Adding ${10 - selectedQuestions.length} least recently used questions.`);
+        
+        // Get IDs of already selected questions to exclude them
+        const selectedIds = selectedQuestions.map(q => q._id);
+        
+        const additionalQuestions = await Question.find({
+          _id: { $nin: selectedIds },
+          isApproved: true
+        })
+        .sort({ lastUsed: 1, usageCount: 1 })
+        .limit(10 - selectedQuestions.length);
+        
+        selectedQuestions = [...selectedQuestions, ...additionalQuestions];
+      }
+      
+      // Verify we have enough questions
+      if (selectedQuestions.length < 5) {
         throw new Error('Not enough questions in the database. Minimum 5 questions required.');
       }
       
+      // Ensure we have exactly 10 questions (or at least what we could find)
+      selectedQuestions = selectedQuestions.slice(0, 10);
+      
+      // Create the daily quiz
       dailyQuiz = await this.create({
         date: today,
-        questions: questions.map(q => q._id),
+        questions: selectedQuestions.map(q => q._id),
         active: true,
         theme: todayTheme._id,
         themeName: todayTheme.name,
         themeDescription: todayTheme.description || `Today's theme is ${todayTheme.name}`
       });
+      
+      // Update usage statistics for all selected questions
+      for (const question of selectedQuestions) {
+        question.usageCount += 1;
+        question.lastUsed = new Date();
+        await question.save();
+      }
+      
+      console.log(`Created new daily quiz with ${selectedQuestions.length} questions. Theme: ${todayTheme.name}`);
       
       // Populate the questions and theme
       dailyQuiz = await this.findById(dailyQuiz._id).populate('questions').populate('theme');

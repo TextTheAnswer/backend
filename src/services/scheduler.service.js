@@ -11,14 +11,17 @@ exports.scheduleDailyTasks = () => {
     try {
       console.log('Running daily scheduled tasks...');
       
-      // 1. Determine daily quiz winner
+      // 1. Determine daily quiz winner from yesterday
       await determineDailyQuizWinner();
       
       // 2. Reset daily quiz stats for all users
       await resetDailyQuizStats();
       
-      // 3. Create new daily quiz for today
+      // 3. Create new daily quiz for today with fresh questions
       await createNewDailyQuiz();
+      
+      // 4. Archive and clean up old questions if needed
+      await cleanupOldQuizzes();
       
       console.log('Daily scheduled tasks completed successfully');
     } catch (error) {
@@ -68,9 +71,6 @@ async function determineDailyQuizWinner() {
     
     if (awarded) {
       console.log(`Daily quiz winner ${topUser._id} awarded 1 month free premium subscription! Score: ${topUser.dailyQuiz.score}`);
-      
-      // Reset all users' daily quiz stats
-      await resetDailyQuizStats();
     } else {
       console.log(`Failed to award premium to user ${topUser._id}`);
     }
@@ -89,7 +89,8 @@ async function resetDailyQuizStats() {
       { 
         $set: { 
           'dailyQuiz.questionsAnswered': 0,
-          'dailyQuiz.correctAnswers': 0
+          'dailyQuiz.correctAnswers': 0,
+          'dailyQuiz.score': 0
         }
       }
     );
@@ -110,6 +111,51 @@ async function createNewDailyQuiz() {
     console.log(`Created new daily quiz for today with ${dailyQuiz.questions.length} questions`);
   } catch (error) {
     console.error('Error creating new daily quiz:', error);
+    throw error;
+  }
+}
+
+// Archive old quizzes and ensure cleanup
+async function cleanupOldQuizzes() {
+  try {
+    // Find and deactivate quizzes older than 30 days that are still active
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const result = await DailyQuiz.updateMany(
+      { 
+        date: { $lt: thirtyDaysAgo },
+        active: true
+      },
+      {
+        $set: { active: false }
+      }
+    );
+    
+    if (result.modifiedCount > 0) {
+      console.log(`Archived ${result.modifiedCount} old daily quizzes`);
+    }
+
+    // Find yesterday's quiz to delete its questions from the database
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    
+    // Get yesterday's daily quiz with its questions
+    const dailyQuiz = await DailyQuiz.findOne({ date: yesterday }).populate('questions');
+    
+    if (dailyQuiz && dailyQuiz.questions && dailyQuiz.questions.length > 0) {
+      const Question = require('../models/question.model');
+      // Get the question IDs to delete
+      const questionIds = dailyQuiz.questions.map(q => q._id);
+      
+      // Delete all questions used in yesterday's quiz
+      const deleteResult = await Question.deleteMany({ _id: { $in: questionIds } });
+      
+      console.log(`Deleted ${deleteResult.deletedCount} questions from yesterday's quiz to avoid repetition`);
+    }
+  } catch (error) {
+    console.error('Error cleaning up old quizzes:', error);
     throw error;
   }
 }

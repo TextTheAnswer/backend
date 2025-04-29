@@ -52,6 +52,18 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastRequestTimestamp = null;
     let lastResponseTime = null;
     
+    // Timer variables
+    let timerInterval = null;
+    let remainingTime = 15;
+    let demoQuestions = [
+        { text: "What is the capital of France?", answer: "Paris" },
+        { text: "Which planet is known as the Red Planet?", answer: "Mars" },
+        { text: "What is 2 + 2?", answer: "4" },
+        { text: "Who wrote Romeo and Juliet?", answer: "Shakespeare" },
+        { text: "What is the largest ocean on Earth?", answer: "Pacific" }
+    ];
+    let currentQuestionIndex = 0;
+    
     // Initialize dev/regular mode from localStorage
     initializeMode();
     
@@ -101,6 +113,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <strong>Category:</strong> ${selectedQuestion.category || 'General'}<br>
                     <strong>Difficulty:</strong> ${selectedQuestion.difficulty || 'Medium'}
                 `;
+                // Update time limit to always show 15 seconds
+                document.getElementById('question-time-limit').textContent = "15";
             }
         } else {
             selectedQuestionText.textContent = 'No question selected';
@@ -124,6 +138,27 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('upload-material-form').addEventListener('submit', uploadMaterial);
     document.getElementById('get-materials').addEventListener('click', getMaterials);
     document.getElementById('generate-questions-form').addEventListener('submit', generateQuestions);
+    
+    // Setup timer demo buttons
+    const startTimerBtn = document.getElementById('start-timer-demo');
+    const resetTimerBtn = document.getElementById('reset-timer-demo');
+    const demoSubmitBtn = document.getElementById('demo-submit');
+    const demoAnswerInput = document.getElementById('demo-answer');
+    const timerCountdown = document.getElementById('timer-countdown');
+    const timerProgressBar = document.getElementById('timer-progress-bar');
+    const demoQuestionText = document.getElementById('demo-question-text');
+
+    if (startTimerBtn) {
+        startTimerBtn.addEventListener('click', startTimerDemo);
+    }
+    
+    if (resetTimerBtn) {
+        resetTimerBtn.addEventListener('click', resetTimerDemo);
+    }
+    
+    if (demoSubmitBtn) {
+        demoSubmitBtn.addEventListener('click', submitDemoAnswer);
+    }
     
     // Initialize dev/regular mode
     function initializeMode() {
@@ -609,12 +644,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const questionId = document.getElementById('question-select').value;
             const answer = document.getElementById('answer').value;
+            const timeSpent = parseFloat(document.getElementById('time-spent').value);
             
             if (!questionId) {
                 return displayResponse({ success: false, message: 'Please select a question' });
             }
             
-            const response = await fetch(API_BASE_URL + '/quiz/submit', {
+            const response = await fetch(API_BASE_URL + '/quiz/daily/submit', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${authToken.value}`,
@@ -622,7 +658,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     questionId,
-                    answer
+                    answer,
+                    timeSpent
                 })
             });
             
@@ -988,5 +1025,237 @@ document.addEventListener('DOMContentLoaded', function() {
             responseDisplay.classList.add('error');
             responseDisplay.classList.remove('success');
         }
+    }
+
+    function startTimerDemo() {
+        // Reset and initialize
+        resetTimerDemo();
+        startTimerBtn.disabled = true;
+        demoAnswerInput.disabled = false;
+        demoSubmitBtn.disabled = false;
+        demoAnswerInput.focus();
+        
+        // Load the first question
+        loadDemoQuestion();
+        
+        // Start the countdown
+        timerInterval = setInterval(updateTimer, 1000);
+    }
+    
+    function updateTimer() {
+        remainingTime--;
+        
+        // Update the timer display
+        timerCountdown.textContent = remainingTime;
+        
+        // Update progress bar
+        const progressPercentage = (remainingTime / 15) * 100;
+        timerProgressBar.style.width = `${progressPercentage}%`;
+        
+        // Change colors based on time
+        if (remainingTime <= 5) {
+            timerCountdown.classList.add('danger');
+            timerCountdown.classList.remove('warning');
+            timerProgressBar.classList.add('danger');
+            timerProgressBar.classList.remove('warning');
+            timerCountdown.classList.add('timer-pulse');
+        } else if (remainingTime <= 10) {
+            timerCountdown.classList.add('warning');
+            timerCountdown.classList.remove('danger');
+            timerProgressBar.classList.add('warning');
+            timerProgressBar.classList.remove('danger');
+            timerCountdown.classList.remove('timer-pulse');
+        }
+        
+        // Check if time's up
+        if (remainingTime <= 0) {
+            clearInterval(timerInterval);
+            timeExpired();
+        }
+    }
+    
+    function resetTimerDemo() {
+        // Clear any existing timer
+        clearInterval(timerInterval);
+        
+        // Reset timer values
+        remainingTime = 15;
+        timerCountdown.textContent = remainingTime;
+        timerProgressBar.style.width = '100%';
+        
+        // Reset styles
+        timerCountdown.classList.remove('warning', 'danger', 'timer-pulse');
+        timerProgressBar.classList.remove('warning', 'danger');
+        
+        // Reset controls
+        startTimerBtn.disabled = false;
+        demoAnswerInput.disabled = true;
+        demoSubmitBtn.disabled = true;
+        demoAnswerInput.value = '';
+        
+        // Hide the result div
+        const resultDiv = document.getElementById('demo-result');
+        resultDiv.style.display = 'none';
+        
+        // Reset to first question
+        currentQuestionIndex = 0;
+        demoQuestionText.textContent = demoQuestions[0].text;
+    }
+    
+    function submitDemoAnswer() {
+        // Stop the timer
+        clearInterval(timerInterval);
+        
+        // Get user's answer
+        const userAnswer = demoAnswerInput.value.trim().toLowerCase();
+        const correctAnswer = demoQuestions[currentQuestionIndex].answer.toLowerCase();
+        
+        // Calculate score based on time
+        const timeSpent = 15 - remainingTime;
+        const isCorrect = userAnswer === correctAnswer;
+        
+        showDemoResult(isCorrect, correctAnswer, timeSpent);
+        
+        // After 2 seconds, move to next question or end demo
+        setTimeout(() => {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < demoQuestions.length) {
+                loadDemoQuestion();
+                
+                // Reset timer for next question
+                remainingTime = 15;
+                timerCountdown.textContent = remainingTime;
+                timerProgressBar.style.width = '100%';
+                timerCountdown.classList.remove('warning', 'danger', 'timer-pulse');
+                timerProgressBar.classList.remove('warning', 'danger');
+                
+                // Clear input
+                demoAnswerInput.value = '';
+                demoAnswerInput.focus();
+                
+                // Hide result
+                document.getElementById('demo-result').style.display = 'none';
+                
+                // Start the timer again
+                timerInterval = setInterval(updateTimer, 1000);
+            } else {
+                // End of demo
+                demoQuestionText.textContent = "Demo completed!";
+                startTimerBtn.disabled = false;
+                demoAnswerInput.disabled = true;
+                demoSubmitBtn.disabled = true;
+                
+                // Show final message in the result div
+                const resultDiv = document.getElementById('demo-result');
+                resultDiv.className = 'demo-result';
+                resultDiv.style.backgroundColor = '#d1ecf1';
+                resultDiv.style.borderColor = '#bee5eb';
+                resultDiv.style.color = '#0c5460';
+                resultDiv.innerHTML = `
+                    <strong>Demo Completed!</strong><br>
+                    You've seen how the 15-second timer works. In the real app, users will automatically 
+                    advance through all questions with this timer.
+                `;
+                resultDiv.style.display = 'block';
+            }
+        }, 2000);
+    }
+    
+    function timeExpired() {
+        const correctAnswer = demoQuestions[currentQuestionIndex].answer;
+        
+        showDemoResult(false, correctAnswer, 15, true);
+        
+        // After 2 seconds, move to next question or end demo
+        setTimeout(() => {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < demoQuestions.length) {
+                loadDemoQuestion();
+                
+                // Reset timer for next question
+                remainingTime = 15;
+                timerCountdown.textContent = remainingTime;
+                timerProgressBar.style.width = '100%';
+                timerCountdown.classList.remove('warning', 'danger', 'timer-pulse');
+                timerProgressBar.classList.remove('warning', 'danger');
+                
+                // Clear input
+                demoAnswerInput.value = '';
+                demoAnswerInput.focus();
+                
+                // Hide result
+                document.getElementById('demo-result').style.display = 'none';
+                
+                // Start the timer again
+                timerInterval = setInterval(updateTimer, 1000);
+            } else {
+                // End of demo
+                demoQuestionText.textContent = "Demo completed!";
+                startTimerBtn.disabled = false;
+                demoAnswerInput.disabled = true;
+                demoSubmitBtn.disabled = true;
+                
+                // Show final message in the result div
+                const resultDiv = document.getElementById('demo-result');
+                resultDiv.className = 'demo-result';
+                resultDiv.style.backgroundColor = '#d1ecf1';
+                resultDiv.style.borderColor = '#bee5eb';
+                resultDiv.style.color = '#0c5460';
+                resultDiv.innerHTML = `
+                    <strong>Demo Completed!</strong><br>
+                    You've seen how the 15-second timer works. In the real app, users will automatically 
+                    advance through all questions with this timer.
+                `;
+                resultDiv.style.display = 'block';
+            }
+        }, 2000);
+    }
+    
+    function showDemoResult(isCorrect, correctAnswer, timeSpent, timeout = false) {
+        // Get the existing result div
+        const resultDiv = document.getElementById('demo-result');
+        
+        // Clear any existing classes
+        resultDiv.className = 'demo-result';
+        
+        if (timeout) {
+            resultDiv.classList.add('timeout');
+            resultDiv.innerHTML = `
+                <strong>Time's up!</strong><br>
+                The correct answer was: ${correctAnswer}<br>
+                Points: 0
+            `;
+        } else if (isCorrect) {
+            resultDiv.classList.add('correct');
+            
+            // Calculate score using the formula from the backend
+            const basePoints = 100;
+            const timeBonus = Math.round((1 - (timeSpent / 15)) * 100);
+            const points = basePoints + timeBonus;
+            
+            resultDiv.innerHTML = `
+                <strong>Correct!</strong><br>
+                Time: ${timeSpent} seconds<br>
+                Points: ${points} (Base: 100 + Time Bonus: ${timeBonus})
+            `;
+        } else {
+            resultDiv.classList.add('incorrect');
+            resultDiv.innerHTML = `
+                <strong>Incorrect!</strong><br>
+                The correct answer was: ${correctAnswer}<br>
+                Points: 0
+            `;
+        }
+        
+        // Show the result
+        resultDiv.style.display = 'block';
+        
+        // Disable input during result display
+        demoAnswerInput.disabled = true;
+        demoSubmitBtn.disabled = true;
+    }
+    
+    function loadDemoQuestion() {
+        demoQuestionText.textContent = demoQuestions[currentQuestionIndex].text;
     }
 });

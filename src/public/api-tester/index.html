@@ -189,6 +189,36 @@
                     <h3>Daily Quiz</h3>
                     <button id="get-daily-questions" class="btn-primary"><i class="fas fa-sync"></i> Get Daily Questions</button>
                     
+                    <div class="timer-demo-container">
+                        <h4><i class="fas fa-clock"></i> 15-Second Timer Demo</h4>
+                        <div class="timer-info">
+                            <p>All daily quiz questions now have a strict 15-second time limit.</p>
+                            <ul>
+                                <li>Timer automatically starts with each question</li>
+                                <li>When time runs out, the app advances to the next question</li>
+                                <li>Faster answers get more points!</li>
+                            </ul>
+                        </div>
+                        <div class="demo-question-container">
+                            <div class="timer-display">
+                                <div class="timer-countdown" id="timer-countdown">15</div>
+                                <div class="timer-progress">
+                                    <div class="timer-progress-bar" id="timer-progress-bar"></div>
+                                </div>
+                            </div>
+                            <div class="demo-question">
+                                <h4 id="demo-question-text">What is the capital of France?</h4>
+                                <input type="text" id="demo-answer" placeholder="Type your answer...">
+                                <button id="demo-submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Submit</button>
+                            </div>
+                            <div class="demo-controls">
+                                <button id="start-timer-demo" class="btn-primary"><i class="fas fa-play"></i> Start Demo</button>
+                                <button id="reset-timer-demo" class="btn-secondary"><i class="fas fa-redo"></i> Reset Demo</button>
+                            </div>
+                            <div class="demo-result" id="demo-result"></div>
+                        </div>
+                    </div>
+                    
                     <div id="questions-container" class="hidden">
                         <h4><i class="fas fa-list"></i> Available Questions</h4>
                         <div class="theme-info" id="theme-info">
@@ -212,10 +242,18 @@
                             </div>
                             <div class="form-group question-display">
                                 <div id="selected-question-text">No question selected</div>
+                                <div class="time-limit-display">
+                                    <i class="fas fa-clock"></i> Time Limit: <span id="question-time-limit">15</span> seconds
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="answer">Your Answer:</label>
                                 <input type="text" id="answer" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="time-spent">Time Spent (seconds):</label>
+                                <input type="number" id="time-spent" min="1" max="15" value="10" step="0.1">
+                                <small>Simulate different answer times (1-15 seconds)</small>
                             </div>
                             <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Submit Answer</button>
                         </form>
