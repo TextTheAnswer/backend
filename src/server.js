@@ -109,6 +109,27 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Text the Answer API' });
 });
 
+// Root API route handler
+app.get('/api', (req, res) => {
+  res.json({
+    name: 'Text The Answer API',
+    version: '1.0.0',
+    status: 'active',
+    endpoints: [
+      '/api/auth',
+      '/api/quiz',
+      '/api/game',
+      '/api/leaderboard',
+      '/api/subscription',
+      '/api/mock-subscription',
+      '/api/study-materials',
+      '/api/demo',
+      '/api/profile'
+    ],
+    documentation: '/api-docs'
+  });
+});
+
 // Test email route (only in development)
 if (process.env.NODE_ENV === 'development') {
   app.get('/api/test-email', async (req, res) => {
