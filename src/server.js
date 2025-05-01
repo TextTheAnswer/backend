@@ -27,8 +27,25 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: function(origin, callback) {
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'https://tta-kha7.onrender.com',
+        'https://text-the-answer.vercel.app',
+        'https://text-the-answer-web.vercel.app'
+      ];
+      
+      // Allow requests with no origin (mobile apps, curl, etc)
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
   }
 });
 
@@ -79,7 +96,28 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJsDoc(swaggerOptions);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'https://tta-kha7.onrender.com',
+      'https://text-the-answer.vercel.app',
+      'https://text-the-answer-web.vercel.app'
+    ];
+    
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 app.use(express.static('src/public')); // Add this line to serve static files
