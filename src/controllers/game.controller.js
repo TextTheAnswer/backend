@@ -426,3 +426,301 @@ exports.getGameResults = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get user's game history
+ * Returns paginated list of games the user has participated in
+ */
+exports.getGameHistory = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Build query to find games the user participated in
+    const query = { 'participants.userId': req.user.id };
+    
+    // Add filter for game status if provided
+    if (status && ['completed', 'in-progress'].includes(status)) {
+      query.status = status;
+    }
+    
+    // Find games and count total
+    const games = await Game.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate('category', 'name')
+      .populate('winner', 'name')
+      .populate('createdBy', 'name');
+      
+    const total = await Game.countDocuments(query);
+    
+    // Format the response for each game
+    const formattedGames = games.map(game => {
+      // Find user's data in participants array
+      const userParticipant = game.participants.find(
+        p => p.userId.toString() === req.user.id
+      );
+      
+      return {
+        gameId: game._id,
+        date: game.createdAt,
+        name: game.name,
+        theme: game.theme,
+        category: game.category ? game.category.name : null,
+        participants: game.participants.length,
+        userPosition: userParticipant ? userParticipant.position : null,
+        userScore: userParticipant ? userParticipant.score : 0,
+        status: game.status,
+        winnerName: game.winner ? game.winner.name : null
+      };
+    });
+    
+    res.status(200).json({
+      success: true,
+      games: formattedGames,
+      pagination: {
+        total,
+        pages: Math.ceil(total / limitNum),
+        currentPage: pageNum,
+        hasMore: pageNum * limitNum < total
+      }
+    });
+  } catch (error) {
+    console.error('Get game history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving game history',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Get detailed information about a specific game
+ * Includes questions, participants, and user's answers
+ */
+exports.getGameDetails = async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    
+    // Find the game with populated fields
+    const game = await Game.findById(gameId)
+      .populate('questions', 'text category difficulty correctAnswer')
+      .populate('category', 'name')
+      .populate('createdBy', 'name')
+      .populate('participants.userId', 'name');
+    
+    if (!game) {
+      return res.status(404).json({
+        success: false,
+        message: 'Game not found'
+      });
+    }
+    
+    // Check if user participated in this game
+    const userParticipant = game.participants.find(
+      p => p.userId._id.toString() === req.user.id
+    );
+    
+    if (!userParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this game data'
+      });
+    }
+    
+    // Format the detailed game data
+    const detailedGame = {
+      id: game._id,
+      name: game.name || `Game #${game._id.toString().substr(-6)}`,
+      date: game.createdAt,
+      category: game.category ? game.category.name : null,
+      difficulty: game.difficulty,
+      createdBy: game.createdBy ? game.createdBy.name : 'Unknown',
+      status: game.status,
+      questions: game.questions.map(q => ({
+        id: q._id,
+        question: q.text,
+        correctAnswer: q.correctAnswer
+      })),
+      participants: game.participants.map(p => ({
+        userId: p.userId._id,
+        name: p.userId.name,
+        score: p.score,
+        position: p.position,
+        answeredCorrect: p.answers.filter(a => a.isCorrect).length,
+        answeredIncorrect: p.answers.filter(a => !a.isCorrect).length,
+        timeToComplete: p.answers.reduce((sum, a) => sum + (a.timeSpent || 0), 0)
+      })),
+      userAnswers: userParticipant.answers.map(a => ({
+        questionId: a.questionId,
+        answer: a.answer,
+        isCorrect: a.isCorrect,
+        timeSpent: a.timeSpent
+      }))
+    };
+    
+    res.status(200).json({
+      success: true,
+      game: detailedGame
+    });
+  } catch (error) {
+    console.error('Get game details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving game details',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Get user's game statistics
+ * Provides aggregated stats about multiplayer game performance
+ */
+exports.getGameStats = async (req, res) => {
+  try {
+    // Find all games the user has participated in
+    const games = await Game.find({
+      'participants.userId': req.user.id,
+      'status': 'completed'
+    });
+    
+    if (games.length === 0) {
+      return res.status(200).json({
+        success: true,
+        stats: {
+          totalGamesPlayed: 0,
+          gamesWon: 0,
+          averagePosition: null,
+          averageScore: null,
+          totalQuestionsAnswered: 0,
+          correctAnswerRate: null,
+          fastestTime: null,
+          favoriteCategory: null,
+          mostPlayedWith: []
+        }
+      });
+    }
+    
+    // Calculate statistics
+    let totalGamesPlayed = games.length;
+    let gamesWon = 0;
+    let totalPosition = 0;
+    let totalScore = 0;
+    let totalQuestionsAnswered = 0;
+    let correctAnswers = 0;
+    let fastestTime = Number.MAX_VALUE;
+    let categoryCount = {};
+    let playedWith = {};
+    
+    // Process each game for stats
+    games.forEach(game => {
+      // Find user's participant data
+      const userParticipant = game.participants.find(
+        p => p.userId.toString() === req.user.id
+      );
+      
+      if (!userParticipant) return;
+      
+      // Track wins
+      if (game.winner && game.winner.toString() === req.user.id) {
+        gamesWon++;
+      }
+      
+      // Track positions and scores
+      if (userParticipant.position) {
+        totalPosition += userParticipant.position;
+      }
+      totalScore += userParticipant.score || 0;
+      
+      // Track questions and correct answers
+      const userAnswers = userParticipant.answers || [];
+      totalQuestionsAnswered += userAnswers.length;
+      correctAnswers += userAnswers.filter(a => a.isCorrect).length;
+      
+      // Track fastest time
+      const gameTime = userAnswers.reduce((sum, a) => sum + (a.timeSpent || 0), 0);
+      if (gameTime > 0 && gameTime < fastestTime) {
+        fastestTime = gameTime;
+      }
+      
+      // Track categories
+      if (game.category) {
+        const categoryId = game.category.toString();
+        categoryCount[categoryId] = (categoryCount[categoryId] || 0) + 1;
+      }
+      
+      // Track other players
+      game.participants.forEach(p => {
+        if (p.userId.toString() !== req.user.id) {
+          const otherId = p.userId.toString();
+          playedWith[otherId] = (playedWith[otherId] || 0) + 1;
+        }
+      });
+    });
+    
+    // Find favorite category
+    let favoriteCategory = null;
+    let maxCategoryCount = 0;
+    for (const [categoryId, count] of Object.entries(categoryCount)) {
+      if (count > maxCategoryCount) {
+        favoriteCategory = categoryId;
+        maxCategoryCount = count;
+      }
+    }
+    
+    // Find most played with users
+    const playedWithArray = Object.entries(playedWith)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([userId, count]) => userId);
+      
+    // If we have a favorite category, get its name
+    let favoriteCategoryName = null;
+    if (favoriteCategory) {
+      const category = await require('../models/category.model').findById(favoriteCategory);
+      if (category) {
+        favoriteCategoryName = category.name;
+      }
+    }
+    
+    // Get names of most played with users
+    let mostPlayedWithNames = [];
+    if (playedWithArray.length > 0) {
+      const users = await require('../models/user.model').find({
+        _id: { $in: playedWithArray }
+      }).select('name');
+      
+      mostPlayedWithNames = users.map(u => u.name);
+    }
+    
+    // Format the final statistics
+    const stats = {
+      totalGamesPlayed,
+      gamesWon,
+      averagePosition: totalGamesPlayed > 0 ? (totalPosition / totalGamesPlayed).toFixed(1) : null,
+      averageScore: totalGamesPlayed > 0 ? (totalScore / totalGamesPlayed).toFixed(1) : null,
+      totalQuestionsAnswered,
+      correctAnswerRate: totalQuestionsAnswered > 0 ? (correctAnswers / totalQuestionsAnswered).toFixed(2) : null,
+      fastestTime: fastestTime !== Number.MAX_VALUE ? fastestTime.toFixed(1) : null,
+      favoriteCategory: favoriteCategoryName,
+      mostPlayedWith: mostPlayedWithNames
+    };
+    
+    res.status(200).json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('Get game stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving game statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};

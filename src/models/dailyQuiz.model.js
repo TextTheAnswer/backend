@@ -22,7 +22,7 @@ const dailyQuizSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  // New fields for category-based themes
+  // Theme fields
   theme: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
@@ -34,7 +34,62 @@ const dailyQuizSchema = new mongoose.Schema({
   },
   themeDescription: {
     type: String
-  }
+  },
+  // New fields for live multiplayer functionality
+  events: [{
+    startTime: {
+      type: Date,
+      required: true
+    },
+    endTime: {
+      type: Date,
+      required: true
+    },
+    timeZone: {
+      type: String,
+      default: 'UTC'
+    },
+    status: {
+      type: String,
+      enum: ['scheduled', 'active', 'completed'],
+      default: 'scheduled'
+    },
+    participants: [{
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      joinedAt: {
+        type: Date,
+        default: Date.now
+      },
+      score: {
+        type: Number,
+        default: 0
+      },
+      correctAnswers: {
+        type: Number,
+        default: 0
+      },
+      answerTimes: [Number], // Response times in milliseconds for each question
+      answers: [Boolean],     // Correctness of each answer
+      completed: {
+        type: Boolean,
+        default: false
+      }
+    }],
+    currentQuestionIndex: {
+      type: Number,
+      default: -1 // -1 means not started
+    },
+    winner: {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      score: Number
+    }
+  }]
 }, {
   timestamps: true
 });
@@ -109,6 +164,31 @@ dailyQuizSchema.statics.getTodayQuiz = async function() {
       // Ensure we have exactly 10 questions (or at least what we could find)
       selectedQuestions = selectedQuestions.slice(0, 10);
       
+      // Create default event times (9AM, 3PM, 9PM UTC)
+      const eventTimes = [
+        { hour: 9, minute: 0 },
+        { hour: 15, minute: 0 },
+        { hour: 21, minute: 0 }
+      ];
+      
+      // Create event objects
+      const events = eventTimes.map(time => {
+        const startTime = new Date(today);
+        startTime.setHours(time.hour, time.minute, 0, 0);
+        
+        const endTime = new Date(startTime);
+        endTime.setMinutes(endTime.getMinutes() + 30); // 30-minute event
+        
+        return {
+          startTime,
+          endTime,
+          timeZone: 'UTC',
+          status: 'scheduled',
+          participants: [],
+          currentQuestionIndex: -1
+        };
+      });
+      
       // Create the daily quiz
       dailyQuiz = await this.create({
         date: today,
@@ -116,7 +196,8 @@ dailyQuizSchema.statics.getTodayQuiz = async function() {
         active: true,
         theme: todayTheme._id,
         themeName: todayTheme.name,
-        themeDescription: todayTheme.description || `Today's theme is ${todayTheme.name}`
+        themeDescription: todayTheme.description || `Today's theme is ${todayTheme.name}`,
+        events: events
       });
       
       // Update usage statistics for all selected questions
@@ -127,6 +208,7 @@ dailyQuizSchema.statics.getTodayQuiz = async function() {
       }
       
       console.log(`Created new daily quiz with ${selectedQuestions.length} questions. Theme: ${todayTheme.name}`);
+      console.log(`Scheduled ${events.length} live events for today`);
       
       // Populate the questions and theme
       dailyQuiz = await this.findById(dailyQuiz._id).populate('questions').populate('theme');
@@ -135,6 +217,44 @@ dailyQuizSchema.statics.getTodayQuiz = async function() {
     return dailyQuiz;
   } catch (error) {
     console.error('Error in getTodayQuiz:', error);
+    throw error;
+  }
+};
+
+// Method to get upcoming and active events
+dailyQuizSchema.statics.getUpcomingEvents = async function() {
+  try {
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    
+    const dailyQuiz = await this.findOne({ date: today });
+    if (!dailyQuiz) {
+      return [];
+    }
+    
+    // Filter for upcoming and active events
+    return dailyQuiz.events.filter(event => {
+      return event.endTime > now && 
+            (event.status === 'scheduled' || event.status === 'active');
+    });
+  } catch (error) {
+    console.error('Error in getUpcomingEvents:', error);
+    throw error;
+  }
+};
+
+// Method to find a specific event by ID
+dailyQuizSchema.statics.findEventById = async function(quizId, eventId) {
+  try {
+    const quiz = await this.findById(quizId);
+    if (!quiz) {
+      return null;
+    }
+    
+    return quiz.events.id(eventId);
+  } catch (error) {
+    console.error('Error in findEventById:', error);
     throw error;
   }
 };
@@ -204,13 +324,39 @@ dailyQuizSchema.statics.createQuizWithTheme = async function(date, themeId, ques
       throw new Error('Not enough questions in the database. Minimum 5 questions required.');
     }
     
+    // Create default event times (9AM, 3PM, 9PM UTC)
+    const eventTimes = [
+      { hour: 9, minute: 0 },
+      { hour: 15, minute: 0 },
+      { hour: 21, minute: 0 }
+    ];
+    
+    // Create event objects
+    const events = eventTimes.map(time => {
+      const startTime = new Date(targetDate);
+      startTime.setHours(time.hour, time.minute, 0, 0);
+      
+      const endTime = new Date(startTime);
+      endTime.setMinutes(endTime.getMinutes() + 30); // 30-minute event
+      
+      return {
+        startTime,
+        endTime,
+        timeZone: 'UTC',
+        status: 'scheduled',
+        participants: [],
+        currentQuestionIndex: -1
+      };
+    });
+    
     const quiz = await this.create({
       date: targetDate,
       questions: questions.map(q => q._id),
       active: true,
       theme: theme._id,
       themeName: theme.name,
-      themeDescription: theme.description || `The theme is ${theme.name}`
+      themeDescription: theme.description || `The theme is ${theme.name}`,
+      events: events
     });
     
     return await this.findById(quiz._id).populate('questions').populate('theme');

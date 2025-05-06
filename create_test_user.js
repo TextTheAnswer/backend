@@ -1,5 +1,5 @@
 /**
- * Simple script to create a test user with premium and education privileges
+ * Script to create a test user with full access to all features
  * Run with: node create_test_user.js
  */
 
@@ -8,36 +8,57 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
 
-// MongoDB connection string
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/texttheanswer';
+// MongoDB connection URI
+const MONGODB_URI = process.env.MONGODB_URI;
 
-// Connection options with increased timeout
+// MongoDB connection options
 const options = {
-  serverSelectionTimeoutMS: 30000, // Increase timeout to 30 seconds
-  connectTimeoutMS: 30000,
-  socketTimeoutMS: 45000,
   useNewUrlParser: true,
-  useUnifiedTopology: true,
-  family: 4 // Force IPv4
+  useUnifiedTopology: true
 };
 
-console.log('Connecting to MongoDB...');
-console.log(`Connection string: ${MONGODB_URI}`);
-
-// Define minimal User model based on the existing schema
-const UserSchema = new mongoose.Schema({
-  email: String,
-  password: String,
-  name: String,
+// Define user schema to match the application model
+const userSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true
+  },
+  password: {
+    type: String,
+    required: function() {
+      return !this.appleId;
+    }
+  },
+  name: {
+    type: String,
+    trim: true
+  },
   profile: {
-    bio: String,
-    location: String,
-    imageUrl: String,
-    imagePublicId: String,
-    preferences: mongoose.Schema.Types.Mixed
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
+    location: {
+      type: String,
+      trim: true
+    },
+    imageUrl: {
+      type: String
+    },
+    imagePublicId: {
+      type: String
+    }
   },
   subscription: {
-    status: String,
+    status: {
+      type: String,
+      enum: ['free', 'premium', 'education'],
+      default: 'free'
+    },
     stripeCustomerId: String,
     stripeSubscriptionId: String,
     currentPeriodStart: Date,
@@ -46,24 +67,77 @@ const UserSchema = new mongoose.Schema({
     freeTrialUsed: Boolean
   },
   education: {
-    isStudent: Boolean,
-    studentEmail: String,
-    yearOfStudy: Number,
-    verificationStatus: String
+    isStudent: {
+      type: Boolean,
+      default: false
+    },
+    studentEmail: {
+      type: String,
+      trim: true,
+      lowercase: true
+    },
+    yearOfStudy: {
+      type: Number,
+      min: 1,
+      max: 7
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
+      default: 'pending'
+    }
   },
   stats: {
-    streak: Number,
+    streak: {
+      type: Number,
+      default: 0
+    },
     lastPlayed: Date,
-    totalCorrect: Number,
-    totalAnswered: Number
+    totalCorrect: {
+      type: Number,
+      default: 0
+    },
+    totalAnswered: {
+      type: Number,
+      default: 0
+    }
   },
   dailyQuiz: {
     lastCompleted: Date,
-    questionsAnswered: Number,
-    correctAnswers: Number,
-    score: Number
+    questionsAnswered: {
+      type: Number,
+      default: 0
+    },
+    correctAnswers: {
+      type: Number,
+      default: 0
+    },
+    score: {
+      type: Number,
+      default: 0
+    }
   }
-}, { timestamps: true });
+}, {
+  timestamps: true
+});
+
+// Add password hashing middleware
+userSchema.pre('save', async function(next) {
+  const user = this;
+  
+  // Only hash the password if it's modified or new
+  if (!user.isModified('password') || !user.password) return next();
+  
+  try {
+    // Generate salt
+    const salt = await bcrypt.genSalt(10);
+    // Hash password
+    user.password = await bcrypt.hash(user.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 async function createTestUser() {
   try {
@@ -71,12 +145,13 @@ async function createTestUser() {
     const email = 'test@gmail.com';
     const password = 'test123';
     
-    // Connect to MongoDB first (await the connection)
+    // Connect to MongoDB
+    console.log('Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI, options);
     console.log('MongoDB connected successfully');
     
-    // Create the User model after connection
-    const User = mongoose.model('User', UserSchema);
+    // Create User model
+    const User = mongoose.model('User', userSchema);
     
     // Check if user exists
     console.log('Checking if user already exists...');
@@ -92,11 +167,11 @@ async function createTestUser() {
       console.log('User already exists, updating to premium...');
       
       // Update existing user with premium access
-      existingUser.name = 'Test Demo User';
+      existingUser.name = 'Test User';
       existingUser.subscription = {
         status: 'premium',
-        stripeCustomerId: 'test_demo_customer',
-        stripeSubscriptionId: 'test_demo_subscription',
+        stripeCustomerId: 'test_customer',
+        stripeSubscriptionId: 'test_subscription',
         currentPeriodStart: new Date(),
         currentPeriodEnd: endDate,
         cancelAtPeriodEnd: false,
@@ -110,29 +185,31 @@ async function createTestUser() {
         verificationStatus: 'verified'
       };
       
+      // If password was changed, make sure to update it
+      if (password !== 'test123') {
+        const salt = await bcrypt.genSalt(10);
+        existingUser.password = await bcrypt.hash(password, salt);
+      }
+      
       await existingUser.save();
       console.log('User updated with premium and education privileges');
       user = existingUser;
     } else {
       console.log('Creating new test user...');
       
-      // Hash password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-      
       // Create new user
       const newUser = new User({
         email,
-        password: hashedPassword,
-        name: 'Test Demo User',
+        password, // Password will be hashed by pre-save hook
+        name: 'Test User',
         profile: {
-          bio: 'This is a test user with premium access',
+          bio: 'This is a test user with full premium access',
           location: 'Test City'
         },
         subscription: {
           status: 'premium',
-          stripeCustomerId: 'test_demo_customer',
-          stripeSubscriptionId: 'test_demo_subscription',
+          stripeCustomerId: 'test_customer',
+          stripeSubscriptionId: 'test_subscription',
           currentPeriodStart: new Date(),
           currentPeriodEnd: endDate,
           cancelAtPeriodEnd: false,
@@ -165,7 +242,7 @@ async function createTestUser() {
     console.log('\nTest user details:');
     console.log(`ID: ${user._id}`);
     console.log(`Email: ${user.email}`);
-    console.log(`Password: test123 (unhashed)`);
+    console.log(`Password: test123 (will be hashed in the database)`);
     console.log(`Name: ${user.name}`);
     console.log(`Subscription: ${user.subscription.status}`);
     console.log(`Education Status: ${user.education.verificationStatus}`);
@@ -173,22 +250,20 @@ async function createTestUser() {
     console.log('\nYou can now log in with test@gmail.com and test123');
     
     // Close the connection
-    console.log('Closing MongoDB connection...');
     await mongoose.connection.close();
     console.log('MongoDB connection closed');
     
-    return true;
+    return user;
   } catch (error) {
-    console.error('Error:', error);
-    // Try to close connection even if there was an error
-    try {
-      if (mongoose.connection.readyState !== 0) {
-        await mongoose.connection.close();
-        console.log('MongoDB connection closed after error');
-      }
-    } catch (closeError) {
-      console.error('Error closing MongoDB connection:', closeError);
+    console.error('Error creating test user:', error);
+    
+    // Close the connection
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.close();
+      console.log('MongoDB connection closed');
     }
+    
+    // Exit with error
     process.exit(1);
   }
 }

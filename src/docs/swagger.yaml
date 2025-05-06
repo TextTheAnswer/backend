@@ -25,6 +25,10 @@ info:
     - **Free**: Limited to 10 questions per day
     - **Premium**: Unlimited questions, multiplayer games, premium features
     - **Education**: Student tier with verified .edu email, similar benefits to premium plus study material scanning
+    
+    ## WebSocket Connections
+    The application uses Socket.io for real-time communication in multiplayer games.
+    Connection details are provided in the Game section.
   
   version: 1.0.0
   contact:
@@ -44,15 +48,179 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
-# Removed global security requirement
-# Individual endpoints will specify their own security requirements
+  
+  schemas:
+    # Common response schemas
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+    
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Error message"
+        error:
+          type: string
+          description: Detailed error (only in development)
+    
+    # User schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "60d21b4667d0d8992e610c85"
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        subscription:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [free, premium, education]
+              example: "premium"
+            expiresAt:
+              type: string
+              format: date-time
+              example: "2023-12-31T23:59:59Z"
+    
+    # Quiz schemas
+    Question:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "60d21b4667d0d8992e610c85"
+        text:
+          type: string
+          example: "What is the capital of France?"
+        category:
+          type: string
+          example: "Geography"
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+          example: "medium"
+        timeLimit:
+          type: integer
+          example: 15
+        options:
+          type: array
+          items:
+            type: string
+          example: ["Berlin", "London", "Paris", "Madrid"]
+        isMultipleChoice:
+          type: boolean
+          example: true
+    
+    # Game schemas
+    Lobby:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "60d21b4667d0d8992e610c85"
+        name:
+          type: string
+          example: "Fun Trivia Room"
+        code:
+          type: string
+          example: "ABCDEF"
+        isPublic:
+          type: boolean
+          example: true
+        host:
+          oneOf:
+            - type: string
+              example: "60d21b4667d0d8992e610c85"
+            - type: object
+              properties:
+                id:
+                  type: string
+                  example: "60d21b4667d0d8992e610c85"
+                name:
+                  type: string
+                  example: "Host Name"
+        players:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                example: "60d21b4667d0d8992e610c85"
+              name:
+                type: string
+                example: "Player Name"
+              ready:
+                type: boolean
+                example: false
+        maxPlayers:
+          type: integer
+          example: 5
+        status:
+          type: string
+          enum: [waiting, playing, finished]
+          example: "waiting"
+    
+    Game:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "60d21b4667d0d8992e610c85"
+        lobbyId:
+          type: string
+          example: "60d21b4667d0d8992e610c85"
+        status:
+          type: string
+          enum: [started, inProgress, finished]
+          example: "inProgress"
+        players:
+          type: array
+          items:
+            type: object
+            properties:
+              user:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "60d21b4667d0d8992e610c85"
+                  name:
+                    type: string
+                    example: "Player Name"
+              score:
+                type: integer
+                example: 850
+              correctAnswers:
+                type: integer
+                example: 9
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
 
 tags:
   - name: Authentication
     description: User authentication and management endpoints
   - name: Quiz
     description: Daily quiz related endpoints
+  - name: Quiz Events
+    description: Live quiz event endpoints for scheduled multiplayer events
   - name: Game
     description: Multiplayer game endpoints
   - name: Leaderboard
@@ -62,6 +230,1446 @@ tags:
   - name: Study Materials
     description: Study material management (Education Tier)
   - name: Profile
-    description: User profile management including profile images (Authentication required)
+    description: User profile management including profile images
+  - name: WebSockets
+    description: Information about WebSocket connections and events
 
-paths: {}
+paths:
+  # Include individual endpoint paths here or reference files
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new user account with name, email, and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "password123"
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticate a user with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "password123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Invalidate the current session token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Logged out successfully"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/profile:
+    get:
+      tags:
+        - Authentication
+      summary: Get user profile
+      description: Retrieve the authenticated user's profile information
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/apple/callback:
+    post:
+      tags:
+        - Authentication
+      summary: Apple OAuth callback
+      description: Handle Apple Sign In authentication callback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - authorizationCode
+                - identityToken
+              properties:
+                authorizationCode:
+                  type: string
+                  example: "authorization_code_from_apple"
+                identityToken:
+                  type: string
+                  example: "identity_token_from_apple"
+      responses:
+        '200':
+          description: Apple authentication successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid Apple credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-student/{token}:
+    get:
+      tags:
+        - Authentication
+      summary: Verify student email
+      description: Verify a student email for education tier access
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Verification token sent to student email
+      responses:
+        '302':
+          description: Redirects to app with verification status
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Quiz Endpoints
+  /quiz/daily:
+    get:
+      tags:
+        - Quiz
+      summary: Get daily questions
+      description: Get questions for today's daily quiz
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Daily questions retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      questions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Question'
+                      questionsAnswered:
+                        type: integer
+                        example: 0
+                      correctAnswers:
+                        type: integer
+                        example: 0
+                      theme:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                            example: "Science"
+                          description:
+                            type: string
+                            example: "Today's theme is Science"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Free tier limit reached
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Free tier users can only answer 10 questions per day. Upgrade to premium for unlimited access."
+
+  /quiz/daily/answer:
+    post:
+      tags:
+        - Quiz
+      summary: Submit answer for daily quiz
+      description: Submit an answer for a question in the daily quiz
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - questionId
+                - answer
+              properties:
+                questionId:
+                  type: string
+                  example: "60d21b4667d0d8992e610c85"
+                answer:
+                  oneOf:
+                    - type: string
+                      example: "Paris"
+                    - type: integer
+                      example: 2
+                timeSpent:
+                  type: number
+                  format: float
+                  example: 7.5
+      responses:
+        '200':
+          description: Answer submitted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      isCorrect:
+                        type: boolean
+                        example: true
+                      points:
+                        type: integer
+                        example: 180
+                      correctAnswer:
+                        type: string
+                        example: "Paris"
+                      explanation:
+                        type: string
+                        example: "Paris is the capital of France"
+                      questionsAnswered:
+                        type: integer
+                        example: 1
+                      correctAnswers:
+                        type: integer
+                        example: 1
+                      totalScore:
+                        type: integer
+                        example: 180
+                      streak:
+                        type: integer
+                        example: 1
+                      withinTimeLimit:
+                        type: boolean
+                        example: true
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Free tier limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Question not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /quiz/daily/stats:
+    get:
+      tags:
+        - Quiz
+      summary: Get daily quiz stats
+      description: Get stats for the current user's daily quiz progress
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      stats:
+                        type: object
+                        properties:
+                          questionsAnswered:
+                            type: integer
+                            example: 5
+                          correctAnswers:
+                            type: integer
+                            example: 4
+                          score:
+                            type: integer
+                            example: 720
+                          streak:
+                            type: integer
+                            example: 3
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /quiz/daily/leaderboard:
+    get:
+      tags:
+        - Quiz
+        - Leaderboard
+      summary: Get daily quiz leaderboard
+      description: Get the leaderboard for today's daily quiz
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Leaderboard retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      leaderboard:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            user:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  example: "60d21b4667d0d8992e610c85"
+                                name:
+                                  type: string
+                                  example: "User Name"
+                            score:
+                              type: integer
+                              example: 950
+                            correctAnswers:
+                              type: integer
+                              example: 10
+                      userRank:
+                        type: integer
+                        example: 5
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Quiz Events Endpoints
+  /quiz/events/upcoming:
+    get:
+      tags:
+        - Quiz Events
+      summary: Get upcoming quiz events
+      description: Get list of upcoming scheduled quiz events
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Upcoming events retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      events:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            quizId:
+                              type: string
+                              example: "60d21b4667d0d8992e610c85"
+                            eventId:
+                              type: string
+                              example: "60d21b4667d0d8992e610c86"
+                            startTime:
+                              type: string
+                              format: date-time
+                              example: "2023-05-01T09:00:00Z"
+                            endTime:
+                              type: string
+                              format: date-time
+                              example: "2023-05-01T09:30:00Z"
+                            timeZone:
+                              type: string
+                              example: "UTC"
+                            status:
+                              type: string
+                              enum: [scheduled, active, completed]
+                              example: "scheduled"
+                            theme:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  example: "Science"
+                                description:
+                                  type: string
+                                  example: "Today's theme is Science"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /quiz/events/{quizId}/{eventId}:
+    get:
+      tags:
+        - Quiz Events
+      summary: Get event details
+      description: Get details for a specific quiz event
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the daily quiz
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the specific event
+      responses:
+        '200':
+          description: Event details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      event:
+                        type: object
+                        properties:
+                          startTime:
+                            type: string
+                            format: date-time
+                            example: "2023-05-01T09:00:00Z"
+                          endTime:
+                            type: string
+                            format: date-time
+                            example: "2023-05-01T09:30:00Z"
+                          timeZone:
+                            type: string
+                            example: "UTC"
+                          status:
+                            type: string
+                            enum: [scheduled, active, completed]
+                            example: "scheduled"
+                          participants:
+                            type: integer
+                            example: 12
+                          theme:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                                example: "Science"
+                              description:
+                                type: string
+                                example: "Today's theme is Science"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /quiz/events/{quizId}/{eventId}/leaderboard:
+    get:
+      tags:
+        - Quiz Events
+        - Leaderboard
+      summary: Get event leaderboard
+      description: Get the leaderboard for a specific quiz event
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the daily quiz
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the specific event
+      responses:
+        '200':
+          description: Event leaderboard retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      leaderboard:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            user:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  example: "60d21b4667d0d8992e610c85"
+                                name:
+                                  type: string
+                                  example: "User Name"
+                            score:
+                              type: integer
+                              example: 950
+                            correctAnswers:
+                              type: integer
+                              example: 10
+                      userRank:
+                        type: integer
+                        example: 5
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /quiz/upcoming-themes:
+    get:
+      tags:
+        - Quiz
+      summary: Get upcoming themes (Premium only)
+      description: Get upcoming daily quiz themes (available only for premium users)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Upcoming themes retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      themes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date-time
+                              example: "2023-05-02T00:00:00Z"
+                            name:
+                              type: string
+                              example: "History"
+                            description:
+                              type: string
+                              example: "Tomorrow's theme is History"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Premium subscription required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  # Game Endpoints
+  /game/lobby:
+    post:
+      tags:
+        - Game
+      summary: Create lobby
+      description: Create a new game lobby (premium only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "My Game Lobby"
+                isPublic:
+                  type: boolean
+                  default: true
+                  example: true
+                maxPlayers:
+                  type: integer
+                  minimum: 2
+                  maximum: 10
+                  default: 5
+                  example: 5
+      responses:
+        '201':
+          description: Lobby created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      lobby:
+                        $ref: '#/components/schemas/Lobby'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Premium subscription required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/lobbies:
+    get:
+      tags:
+        - Game
+      summary: Get public lobbies
+      description: Get list of all public game lobbies (premium only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Public lobbies retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      lobbies:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "60d21b4667d0d8992e610c85"
+                            name:
+                              type: string
+                              example: "Game Lobby"
+                            code:
+                              type: string
+                              example: "ABCDEF"
+                            host:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  example: "60d21b4667d0d8992e610c85"
+                                name:
+                                  type: string
+                                  example: "Host Name"
+                            playerCount:
+                              type: integer
+                              example: 3
+                            maxPlayers:
+                              type: integer
+                              example: 5
+                            isFull:
+                              type: boolean
+                              example: false
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Premium subscription required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/lobby/join:
+    post:
+      tags:
+        - Game
+      summary: Join lobby
+      description: Join a game lobby by code (premium only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  example: "ABCDEF"
+      responses:
+        '200':
+          description: Joined lobby successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      lobby:
+                        $ref: '#/components/schemas/Lobby'
+        '400':
+          description: Invalid code, lobby is full, or lobby not accepting players
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Premium subscription required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lobby not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /game/lobby/{lobbyId}:
+    delete:
+      tags:
+        - Game
+      summary: Leave lobby
+      description: Leave a game lobby
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lobbyId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the lobby to leave
+      responses:
+        '200':
+          description: Left lobby successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Left lobby successfully"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lobby not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/lobby/{lobbyId}/start:
+    post:
+      tags:
+        - Game
+      summary: Start game
+      description: Start a game in a lobby (host only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lobbyId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the lobby to start the game
+      responses:
+        '200':
+          description: Game started successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      game:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: "60d21b4667d0d8992e610c85"
+                          lobbyId:
+                            type: string
+                            example: "60d21b4667d0d8992e610c85"
+                          status:
+                            type: string
+                            example: "started"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Only the host can start the game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lobby not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/answer:
+    post:
+      tags:
+        - Game
+      summary: Submit game answer
+      description: Submit an answer for a question in a multiplayer game
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - gameId
+                - questionId
+                - answer
+              properties:
+                gameId:
+                  type: string
+                  example: "60d21b4667d0d8992e610c85"
+                questionId:
+                  type: string
+                  example: "60d21b4667d0d8992e610c85"
+                answer:
+                  oneOf:
+                    - type: string
+                      example: "Paris"
+                    - type: integer
+                      example: 2
+                timeSpent:
+                  type: number
+                  format: float
+                  example: 5.2
+      responses:
+        '200':
+          description: Answer submitted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      isCorrect:
+                        type: boolean
+                        example: true
+                      points:
+                        type: integer
+                        example: 180
+                      currentScore:
+                        type: integer
+                        example: 450
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game or question not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/results/{gameId}:
+    get:
+      tags:
+        - Game
+      summary: Get game results
+      description: Get results for a completed game
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the game to get results for
+      responses:
+        '200':
+          description: Game results retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      results:
+                        type: object
+                        properties:
+                          gameId:
+                            type: string
+                            example: "60d21b4667d0d8992e610c85"
+                          players:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                user:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      example: "60d21b4667d0d8992e610c85"
+                                    name:
+                                      type: string
+                                      example: "User Name"
+                                score:
+                                  type: integer
+                                  example: 850
+                                correctAnswers:
+                                  type: integer
+                                  example: 9
+                                rank:
+                                  type: integer
+                                  example: 1
+                          userScore:
+                            type: integer
+                            example: 850
+                          userRank:
+                            type: integer
+                            example: 1
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/history:
+    get:
+      tags:
+        - Game
+      summary: Get game history
+      description: Get history of games played by the current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Game history retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      games:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "60d21b4667d0d8992e610c85"
+                            date:
+                              type: string
+                              format: date-time
+                              example: "2023-05-01T15:30:00Z"
+                            players:
+                              type: integer
+                              example: 4
+                            userScore:
+                              type: integer
+                              example: 850
+                            userRank:
+                              type: integer
+                              example: 1
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/history/{gameId}:
+    get:
+      tags:
+        - Game
+      summary: Get game details
+      description: Get detailed information about a specific game
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the game to get details for
+      responses:
+        '200':
+          description: Game details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      game:
+                        $ref: '#/components/schemas/Game'
+                        properties:
+                          date:
+                            type: string
+                            format: date-time
+                            example: "2023-05-01T15:30:00Z"
+                          questions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  example: "60d21b4667d0d8992e610c85"
+                                text:
+                                  type: string
+                                  example: "Question text"
+                                correctAnswer:
+                                  type: string
+                                  example: "Correct answer"
+                          userAnswers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                questionId:
+                                  type: string
+                                  example: "60d21b4667d0d8992e610c85"
+                                answer:
+                                  type: string
+                                  example: "User's answer"
+                                isCorrect:
+                                  type: boolean
+                                  example: true
+                                timeSpent:
+                                  type: number
+                                  format: float
+                                  example: 5.2
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /game/stats:
+    get:
+      tags:
+        - Game
+      summary: Get game stats
+      description: Get game statistics for the current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Game stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      stats:
+                        type: object
+                        properties:
+                          totalGames:
+                            type: integer
+                            example: 15
+                          wins:
+                            type: integer
+                            example: 6
+                          averageScore:
+                            type: integer
+                            example: 723
+                          averageRank:
+                            type: number
+                            format: float
+                            example: 2.3
+                          bestScore:
+                            type: integer
+                            example: 980
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # WebSockets Documentation
+  /socket-documentation:
+    get:
+      tags:
+        - WebSockets
+      summary: WebSocket Connection Guide
+      description: |
+        This is documentation for the WebSocket connections used in the application.
+        The actual endpoint is not a REST API but a Socket.io connection.
+      responses:
+        '200':
+          description: WebSocket documentation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  namespace:
+                    type: string
+                    example: "/game"
+                  connectionUrl: 
+                    type: string
+                    example: "http://localhost:3000/game"
+                  authData:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        example: "user_id"
+                  events:
+                    type: object
+                    properties:
+                      clientToServer:
+                        type: array
+                        description: "Events sent from client to server"
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              example: "join-lobby"
+                            description:
+                              type: string
+                              example: "Join a lobby room"
+                            data:
+                              type: object
+                              example: "lobby_id"
+                      serverToClient:
+                        type: array
+                        description: "Events sent from server to client"
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              example: "lobby-data"
+                            description:
+                              type: string
+                              example: "Lobby data sent when joining a lobby"
+                            data:
+                              type: object
+                  lobbyEvents:
+                    type: object
+                    properties:
+                      join:
+                        type: object
+                        properties:
+                          event:
+                            type: string
+                            example: "join-lobby"
+                          data:
+                            type: string
+                            example: "lobby_id"
+                          response:
+                            type: string
+                            example: "lobby-data"
+                          responseData:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                example: "lobby_id"
+                              name:
+                                type: string
+                                example: "Game Lobby"
+                              code:
+                                type: string
+                                example: "ABCDEF"
+                      leave:
+                        type: object
+                        properties:
+                          event:
+                            type: string
+                            example: "leave-lobby"
+                          data:
+                            type: string
+                            example: "lobby_id"
+                      setReady:
+                        type: object
+                        properties:
+                          event:
+                            type: string
+                            example: "set-ready"
+                          data:
+                            type: object
+                            properties:
+                              lobbyId:
+                                type: string
+                                example: "lobby_id"
+                              ready:
+                                type: boolean
+                                example: true
+                  gameEvents:
+                    type: object
+                    properties:
+                      joinGame:
+                        type: object
+                        properties:
+                          event:
+                            type: string
+                            example: "join-game"
+                          data:
+                            type: string
+                            example: "game_id"
+                      submitAnswer:
+                        type: object
+                        properties:
+                          event:
+                            type: string
+                            example: "submit-answer"
+                          data:
+                            type: object
+                            properties:
+                              gameId:
+                                type: string
+                                example: "game_id"
+                              questionId:
+                                type: string
+                                example: "question_id"
+                              answer:
+                                type: string
+                                example: "answer_text"
+                              timeSpent:
+                                type: number
+                                example: 5.2

@@ -27,4 +27,9 @@ router.post('/answer', gameController.submitGameAnswer);
 // Get game results
 router.get('/results/:gameId', gameController.getGameResults);
 
+// Game history and stats - new endpoints
+router.get('/history', gameController.getGameHistory);
+router.get('/history/:gameId', gameController.getGameDetails);
+router.get('/stats', gameController.getGameStats);
+
 module.exports = router;

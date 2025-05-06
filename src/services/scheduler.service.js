@@ -3,13 +3,15 @@ const DailyQuiz = require('../models/dailyQuiz.model');
 const User = require('../models/user.model');
 const Leaderboard = require('../models/leaderboard.model');
 const { awardFreePremium } = require('../controllers/subscription.controller');
+const logger = require('../utils/logger');
+const dailyQuizEventService = require('./dailyQuizEvent.service');
 
 // Schedule daily tasks
 exports.scheduleDailyTasks = () => {
   // Run at midnight every day
   schedule.scheduleJob('0 0 * * *', async () => {
     try {
-      console.log('Running daily scheduled tasks...');
+      logger.info('Running daily scheduled tasks...');
       
       // 1. Determine daily quiz winner from yesterday
       await determineDailyQuizWinner();
@@ -23,10 +25,18 @@ exports.scheduleDailyTasks = () => {
       // 4. Archive and clean up old questions if needed
       await cleanupOldQuizzes();
       
-      console.log('Daily scheduled tasks completed successfully');
+      // 5. Schedule today's daily quiz events
+      await scheduleQuizEvents();
+      
+      logger.info('Daily scheduled tasks completed successfully');
     } catch (error) {
-      console.error('Error running daily scheduled tasks:', error);
+      logger.error('Error running daily scheduled tasks:', error);
     }
+  });
+  
+  // Also run scheduling tasks on server start to ensure events are scheduled properly
+  scheduleQuizEvents().catch(error => {
+    logger.error('Error scheduling quiz events on server start:', error);
   });
 };
 
@@ -45,37 +55,82 @@ async function determineDailyQuizWinner() {
     });
     
     if (!dailyQuiz) {
-      console.log('No active daily quiz found for yesterday');
+      logger.info('No active daily quiz found for yesterday');
       return;
     }
     
-    // Find user with highest score (must have all 10 questions correct)
-    const topUser = await User.findOne({
-      'dailyQuiz.questionsAnswered': 10,
-      'dailyQuiz.correctAnswers': 10
-    }).sort({ 'dailyQuiz.score': -1 }).limit(1);
-    
-    if (!topUser) {
-      console.log('No eligible winner found for yesterday\'s daily quiz (no perfect scores)');
-      return;
-    }
-    
-    // Update daily quiz with winner
-    dailyQuiz.winner = topUser._id;
-    dailyQuiz.highestScore = topUser.dailyQuiz.score || 0;
-    dailyQuiz.active = false;
-    await dailyQuiz.save();
-    
-    // Award free premium month to winner
-    const awarded = await awardFreePremium(topUser);
-    
-    if (awarded) {
-      console.log(`Daily quiz winner ${topUser._id} awarded 1 month free premium subscription! Score: ${topUser.dailyQuiz.score}`);
+    // Get winner from each event
+    if (dailyQuiz.events && dailyQuiz.events.length > 0) {
+      // Find the top score from all events
+      let topScore = 0;
+      let topUser = null;
+      
+      for (const event of dailyQuiz.events) {
+        if (event.winner && event.winner.score > topScore) {
+          topScore = event.winner.score;
+          topUser = event.winner.user;
+        }
+      }
+      
+      if (topUser) {
+        // Update daily quiz with winner
+        dailyQuiz.winner = topUser;
+        dailyQuiz.highestScore = topScore;
+        dailyQuiz.active = false;
+        await dailyQuiz.save();
+        
+        // Get user object
+        const user = await User.findById(topUser);
+        
+        if (user) {
+          // Award free premium month to winner
+          const awarded = await awardFreePremium(user);
+          
+          if (awarded) {
+            logger.info(`Daily quiz winner ${user._id} awarded 1 month free premium subscription! Score: ${topScore}`);
+          } else {
+            logger.warn(`Failed to award premium to user ${user._id}`);
+          }
+        } else {
+          logger.warn(`Winner user not found: ${topUser}`);
+        }
+      } else {
+        logger.info('No winner found for yesterday\'s daily quiz events');
+        
+        // Still mark as inactive
+        dailyQuiz.active = false;
+        await dailyQuiz.save();
+      }
     } else {
-      console.log(`Failed to award premium to user ${topUser._id}`);
+      // Legacy: Find user with highest score (must have all 10 questions correct)
+      // This is for backward compatibility with the old daily quiz system
+      const topUser = await User.findOne({
+        'dailyQuiz.questionsAnswered': 10,
+        'dailyQuiz.correctAnswers': 10
+      }).sort({ 'dailyQuiz.score': -1 }).limit(1);
+      
+      if (!topUser) {
+        logger.info('No eligible winner found for yesterday\'s daily quiz (no perfect scores)');
+        return;
+      }
+      
+      // Update daily quiz with winner
+      dailyQuiz.winner = topUser._id;
+      dailyQuiz.highestScore = topUser.dailyQuiz.score || 0;
+      dailyQuiz.active = false;
+      await dailyQuiz.save();
+      
+      // Award free premium month to winner
+      const awarded = await awardFreePremium(topUser);
+      
+      if (awarded) {
+        logger.info(`Daily quiz winner ${topUser._id} awarded 1 month free premium subscription! Score: ${topUser.dailyQuiz.score}`);
+      } else {
+        logger.warn(`Failed to award premium to user ${topUser._id}`);
+      }
     }
   } catch (error) {
-    console.error('Error determining daily quiz winner:', error);
+    logger.error('Error determining daily quiz winner:', error);
     throw error;
   }
 }
@@ -95,9 +150,9 @@ async function resetDailyQuizStats() {
       }
     );
     
-    console.log(`Reset daily quiz stats for ${result.modifiedCount} users`);
+    logger.info(`Reset daily quiz stats for ${result.modifiedCount} users`);
   } catch (error) {
-    console.error('Error resetting daily quiz stats:', error);
+    logger.error('Error resetting daily quiz stats:', error);
     throw error;
   }
 }
@@ -108,9 +163,22 @@ async function createNewDailyQuiz() {
     // Create new daily quiz for today
     const dailyQuiz = await DailyQuiz.getTodayQuiz();
     
-    console.log(`Created new daily quiz for today with ${dailyQuiz.questions.length} questions`);
+    logger.info(`Created new daily quiz for today with ${dailyQuiz.questions.length} questions and ${dailyQuiz.events.length} events`);
   } catch (error) {
-    console.error('Error creating new daily quiz:', error);
+    logger.error('Error creating new daily quiz:', error);
+    throw error;
+  }
+}
+
+// Schedule daily quiz events
+async function scheduleQuizEvents() {
+  try {
+    // Schedule today's events
+    await dailyQuizEventService.scheduleDailyQuizEvents();
+    
+    logger.info('Successfully scheduled daily quiz events');
+  } catch (error) {
+    logger.error('Error scheduling daily quiz events:', error);
     throw error;
   }
 }
@@ -133,7 +201,7 @@ async function cleanupOldQuizzes() {
     );
     
     if (result.modifiedCount > 0) {
-      console.log(`Archived ${result.modifiedCount} old daily quizzes`);
+      logger.info(`Archived ${result.modifiedCount} old daily quizzes`);
     }
 
     // Find yesterday's quiz to delete its questions from the database
@@ -152,10 +220,10 @@ async function cleanupOldQuizzes() {
       // Delete all questions used in yesterday's quiz
       const deleteResult = await Question.deleteMany({ _id: { $in: questionIds } });
       
-      console.log(`Deleted ${deleteResult.deletedCount} questions from yesterday's quiz to avoid repetition`);
+      logger.info(`Deleted ${deleteResult.deletedCount} questions from yesterday's quiz to avoid repetition`);
     }
   } catch (error) {
-    console.error('Error cleaning up old quizzes:', error);
+    logger.error('Error cleaning up old quizzes:', error);
     throw error;
   }
 }

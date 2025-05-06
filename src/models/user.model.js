@@ -106,7 +106,21 @@ const userSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
-  }
+  },
+  achievements: [{
+    achievementId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Achievement'
+    },
+    unlockedAt: {
+      type: Date,
+      default: Date.now
+    },
+    viewed: {
+      type: Boolean,
+      default: false
+    }
+  }]
 }, {
   timestamps: true
 });

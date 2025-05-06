@@ -21,6 +21,7 @@ const studyMaterialRoutes = require('./routes/studyMaterial.routes');
 const demoRoutes = require('./routes/demo.routes');
 const profileRoutes = require('./routes/profile.routes');
 const apiTesterRoutes = require('./routes/api-tester.routes');
+const achievementRoutes = require('./routes/achievement.routes');
 
 // Initialize Express app
 const app = express();
@@ -28,6 +29,13 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: function(origin, callback) {
+      // In development mode, allow all origins
+      if (process.env.NODE_ENV === 'development') {
+        callback(null, true);
+        return;
+      }
+      
+      // In production, use a whitelist
       const allowedOrigins = [
         'http://localhost:3000',
         'http://localhost:3001',
@@ -58,7 +66,7 @@ connectWithRetry(connectDB)
     logger.info('Database connection established successfully');
     
     // Initialize database with seed data after connection is established
-    seedQuestions()
+    seedDatabase()
       .then(() => logger.info('Database seeding completed'))
       .catch(err => logger.error('Error seeding database:', err));
       
@@ -71,7 +79,7 @@ connectWithRetry(connectDB)
   });
 
 // Import utilities and services
-const { seedQuestions } = require('./utils/database.utils');
+const { seedDatabase } = require('./utils/database.utils');
 const { scheduleDailyTasks } = require('./services/scheduler.service');
 const logger = require('./utils/logger');
 
@@ -98,6 +106,13 @@ const swaggerSpec = swaggerJsDoc(swaggerOptions);
 // Middleware
 app.use(cors({
   origin: function(origin, callback) {
+    // In development mode, allow all origins
+    if (process.env.NODE_ENV === 'development') {
+      callback(null, true);
+      return;
+    }
+    
+    // In production, use a whitelist
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
@@ -162,7 +177,8 @@ app.get('/api', (req, res) => {
       '/api/mock-subscription',
       '/api/study-materials',
       '/api/demo',
-      '/api/profile'
+      '/api/profile',
+      '/api/achievements'
     ],
     documentation: '/api-docs'
   });
@@ -216,11 +232,16 @@ app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api-tester', apiTesterRoutes);
+app.use('/api/achievements', achievementRoutes);
 
-// Socket.IO setup
-// Initialize socket handlers
+// Import socket handlers
 const gameSocket = require('./socket/game.socket')(io);
 const leaderboardSocket = require('./socket/leaderboard.socket')(io);
+const dailyQuizSocket = require('./socket/dailyQuiz.socket')(io);
+
+// Initialize socket instance for use across modules
+const socketInstance = require('./socket/socket.instance');
+socketInstance.initialize(io);
 
 // Default namespace for basic connections
 io.on('connection', (socket) => {

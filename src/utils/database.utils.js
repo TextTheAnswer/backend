@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Question = require('../models/question.model');
 const seedQuestions = require('./seed-questions.json');
+const { seedAchievements } = require('./achievement.seed');
 
 // Helper function to wait
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -55,5 +56,21 @@ exports.seedQuestions = async (maxRetries = 5, initialDelay = 2000) => {
       await sleep(delay);
       delay *= 1.5; // Exponential backoff
     }
+  }
+};
+
+// Combined seeding function for all initial data
+exports.seedDatabase = async () => {
+  try {
+    // First seed questions
+    await exports.seedQuestions();
+    
+    // Then seed achievements
+    await seedAchievements();
+    
+    console.log('Database seeding completed successfully');
+  } catch (error) {
+    console.error('Error during database seeding:', error);
+    throw error;
   }
 };
