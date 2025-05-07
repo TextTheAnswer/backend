@@ -312,12 +312,6 @@ async function startNextQuestion(sessionId) {
       difficulty: currentQuestion.difficulty,
       timeLimit: 15 // Always 15 seconds for daily quiz
     };
-
-    // For backward compatibility with old multiple choice questions
-    if (currentQuestion.isMultipleChoice) {
-      questionData.isMultipleChoice = true;
-      questionData.options = currentQuestion.options;
-    }
     
     // Emit new question to all participants
     io.of('/daily-quiz').to(`event:${session.quizId}:${session.eventId}`).emit('question-started', {
@@ -604,12 +598,6 @@ exports.joinEvent = async (userId, quizId, eventId) => {
           difficulty: currentQuestion.difficulty,
           timeLimit: 15 // Always 15 seconds for daily quiz
         };
-
-        // For backward compatibility with old multiple choice questions
-        if (currentQuestion.isMultipleChoice) {
-          questionData.isMultipleChoice = true;
-          questionData.options = currentQuestion.options;
-        }
         
         response.currentQuestion = {
           questionIndex: session.currentQuestionIndex,

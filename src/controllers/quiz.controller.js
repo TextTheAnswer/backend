@@ -23,21 +23,13 @@ exports.getDailyQuestions = async (req, res) => {
     
     // Return questions without correct answers
     const questions = dailyQuiz.questions.map(q => {
-      const questionData = {
+      return {
         _id: q._id,
         text: q.text,
         category: q.category,
         difficulty: q.difficulty,
         timeLimit: 15 // Always enforce 15 seconds for daily quiz
       };
-
-      // For backward compatibility with old multiple choice questions
-      if (q.isMultipleChoice) {
-        questionData.isMultipleChoice = true;
-        questionData.options = q.options;
-      }
-      
-      return questionData;
     });
     
     res.status(200).json({
@@ -83,20 +75,12 @@ exports.submitAnswer = async (req, res) => {
       });
     }
     
-    // Check if answer is correct
-    let isCorrect = false;
+    // Check if answer is correct - perform case-insensitive match
+    const userAnswer = answer.trim().toLowerCase();
+    const correctAnswer = question.correctAnswer.toLowerCase();
+    const alternatives = question.alternativeAnswers.map(alt => alt.toLowerCase());
     
-    if (question.isMultipleChoice) {
-      // For legacy multiple choice questions
-      isCorrect = parseInt(answer) === question.correctAnswer;
-    } else {
-      // For new free-text questions - perform case-insensitive match
-      const userAnswer = answer.trim().toLowerCase();
-      const correctAnswer = question.correctAnswer.toLowerCase();
-      const alternatives = question.alternativeAnswers.map(alt => alt.toLowerCase());
-      
-      isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
-    }
+    const isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
     
     // Always enforce 15 seconds for daily quiz
     const timeLimit = 15;
@@ -187,11 +171,6 @@ exports.submitAnswer = async (req, res) => {
       streak: user.stats.streak,
       withinTimeLimit
     };
-    
-    // For backward compatibility with old multiple choice questions
-    if (question.isMultipleChoice) {
-      responseData.correctAnswerIndex = question.correctAnswer;
-    }
     
     // Check for achievement unlocks for premium/education users
     if (user.subscription.status === 'premium' || user.subscription.status === 'education') {
@@ -301,20 +280,12 @@ exports.submitAnswersBulk = async (req, res) => {
         continue;
       }
       
-      // Check if answer is correct
-      let isCorrect = false;
+      // Check if answer is correct - perform case-insensitive match
+      const userAnswer = answer.trim().toLowerCase();
+      const correctAnswer = question.correctAnswer.toLowerCase();
+      const alternatives = question.alternativeAnswers.map(alt => alt.toLowerCase());
       
-      if (question.isMultipleChoice) {
-        // For legacy multiple choice questions
-        isCorrect = parseInt(answer) === question.correctAnswer;
-      } else {
-        // For new free-text questions - perform case-insensitive match
-        const userAnswer = answer.trim().toLowerCase();
-        const correctAnswer = question.correctAnswer.toLowerCase();
-        const alternatives = question.alternativeAnswers.map(alt => alt.toLowerCase());
-        
-        isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
-      }
+      const isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
       
       // Always enforce 15 seconds for daily quiz
       const timeLimit = 15;
@@ -1104,9 +1075,7 @@ exports.createQuestion = async (req, res) => {
       difficulty, 
       correctAnswer, 
       alternativeAnswers,
-      explanation,
-      isMultipleChoice,
-      options
+      explanation
     } = req.body;
     
     // Validate required fields
@@ -1134,8 +1103,6 @@ exports.createQuestion = async (req, res) => {
       correctAnswer,
       alternativeAnswers: alternativeAnswers || [],
       explanation: explanation || '',
-      isMultipleChoice: isMultipleChoice || false,
-      options: options || [],
       usageCount: 0,
       lastUsed: null
     });
@@ -1174,9 +1141,7 @@ exports.updateQuestion = async (req, res) => {
       difficulty, 
       correctAnswer, 
       alternativeAnswers,
-      explanation,
-      isMultipleChoice,
-      options
+      explanation
     } = req.body;
     
     // Find the question
@@ -1205,8 +1170,6 @@ exports.updateQuestion = async (req, res) => {
     if (correctAnswer) question.correctAnswer = correctAnswer;
     if (alternativeAnswers) question.alternativeAnswers = alternativeAnswers;
     if (explanation !== undefined) question.explanation = explanation;
-    if (isMultipleChoice !== undefined) question.isMultipleChoice = isMultipleChoice;
-    if (options) question.options = options;
     
     await question.save();
     
@@ -1411,8 +1374,6 @@ exports.generateQuestions = async (req, res) => {
         correctAnswer: q.correctAnswer,
         alternativeAnswers: q.alternativeAnswers || [],
         explanation: q.explanation || '',
-        isMultipleChoice: q.isMultipleChoice || false,
-        options: q.options || [],
         usageCount: 0,
         lastUsed: null
       });

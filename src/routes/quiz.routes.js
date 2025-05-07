@@ -13,6 +13,7 @@ console.log('submitAnswer exists:', !!quizController.submitAnswer);
 // Protected routes - require authentication
 router.get('/daily', authMiddleware.authenticate, quizController.getDailyQuestions);
 router.post('/daily/answer', authMiddleware.authenticate, quizController.submitAnswer);
+router.post('/daily/answers/bulk', authMiddleware.authenticate, quizController.submitAnswersBulk);
 router.get('/daily/stats', authMiddleware.authenticate, quizController.getDailyStats);
 router.get('/daily/leaderboard', authMiddleware.authenticate, quizController.getDailyLeaderboard);
 

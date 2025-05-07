@@ -396,8 +396,12 @@ module.exports = function(io) {
         const answerTime = new Date();
         const timeElapsed = (answerTime - startTime) / 1000; // in seconds
         
-        // Check if answer is correct
-        const isCorrect = answer === question.correctAnswer;
+        // Check if answer is correct - perform case-insensitive match
+        const userAnswer = answer.trim().toLowerCase();
+        const correctAnswer = question.correctAnswer.toLowerCase();
+        const alternatives = question.alternativeAnswers ? question.alternativeAnswers.map(alt => alt.toLowerCase()) : [];
+        
+        const isCorrect = userAnswer === correctAnswer || alternatives.includes(userAnswer);
         
         // Base score calculation
         let score = 0;

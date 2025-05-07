@@ -35,14 +35,7 @@ const questionSchema = new mongoose.Schema({
     min: 15,
     max: 120
   },
-  isMultipleChoice: {
-    type: Boolean,
-    default: false
-  },
-  options: [{
-    type: String,
-    trim: true
-  }],
+  // isMultipleChoice and options fields removed as we're focusing solely on free-text answers
   // New fields for improved categorization
   tags: [{
     type: String,
