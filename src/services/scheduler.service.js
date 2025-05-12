@@ -14,7 +14,8 @@ exports.scheduleDailyTasks = () => {
       logger.info('Running daily scheduled tasks...');
       
       // 1. Determine daily quiz winner from yesterday
-      await determineDailyQuizWinner();
+      // No longer needed as premium is awarded immediately at the end of the quiz
+      // await determineDailyQuizWinner();
       
       // 2. Reset daily quiz stats for all users
       await resetDailyQuizStats();
@@ -39,101 +40,6 @@ exports.scheduleDailyTasks = () => {
     logger.error('Error scheduling quiz events on server start:', error);
   });
 };
-
-// Determine daily quiz winner and award free premium month
-async function determineDailyQuizWinner() {
-  try {
-    // Get yesterday's date
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    
-    // Find yesterday's daily quiz
-    const dailyQuiz = await DailyQuiz.findOne({ 
-      date: yesterday,
-      active: true
-    });
-    
-    if (!dailyQuiz) {
-      logger.info('No active daily quiz found for yesterday');
-      return;
-    }
-    
-    // Get winner from each event
-    if (dailyQuiz.events && dailyQuiz.events.length > 0) {
-      // Find the top score from all events
-      let topScore = 0;
-      let topUser = null;
-      
-      for (const event of dailyQuiz.events) {
-        if (event.winner && event.winner.score > topScore) {
-          topScore = event.winner.score;
-          topUser = event.winner.user;
-        }
-      }
-      
-      if (topUser) {
-        // Update daily quiz with winner
-        dailyQuiz.winner = topUser;
-        dailyQuiz.highestScore = topScore;
-        dailyQuiz.active = false;
-        await dailyQuiz.save();
-        
-        // Get user object
-        const user = await User.findById(topUser);
-        
-        if (user) {
-          // Award free premium month to winner
-          const awarded = await awardFreePremium(user);
-          
-          if (awarded) {
-            logger.info(`Daily quiz winner ${user._id} awarded 1 month free premium subscription! Score: ${topScore}`);
-          } else {
-            logger.warn(`Failed to award premium to user ${user._id}`);
-          }
-        } else {
-          logger.warn(`Winner user not found: ${topUser}`);
-        }
-      } else {
-        logger.info('No winner found for yesterday\'s daily quiz events');
-        
-        // Still mark as inactive
-        dailyQuiz.active = false;
-        await dailyQuiz.save();
-      }
-    } else {
-      // Legacy: Find user with highest score (must have all 10 questions correct)
-      // This is for backward compatibility with the old daily quiz system
-      const topUser = await User.findOne({
-        'dailyQuiz.questionsAnswered': 10,
-        'dailyQuiz.correctAnswers': 10
-      }).sort({ 'dailyQuiz.score': -1 }).limit(1);
-      
-      if (!topUser) {
-        logger.info('No eligible winner found for yesterday\'s daily quiz (no perfect scores)');
-        return;
-      }
-      
-      // Update daily quiz with winner
-      dailyQuiz.winner = topUser._id;
-      dailyQuiz.highestScore = topUser.dailyQuiz.score || 0;
-      dailyQuiz.active = false;
-      await dailyQuiz.save();
-      
-      // Award free premium month to winner
-      const awarded = await awardFreePremium(topUser);
-      
-      if (awarded) {
-        logger.info(`Daily quiz winner ${topUser._id} awarded 1 month free premium subscription! Score: ${topUser.dailyQuiz.score}`);
-      } else {
-        logger.warn(`Failed to award premium to user ${topUser._id}`);
-      }
-    }
-  } catch (error) {
-    logger.error('Error determining daily quiz winner:', error);
-    throw error;
-  }
-}
 
 // Reset daily quiz stats for all users
 async function resetDailyQuizStats() {

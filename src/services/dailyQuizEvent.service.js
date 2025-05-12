@@ -132,7 +132,12 @@ async function startQuizEvent(quizId, eventId) {
       questionStartTime: new Date(),
       questions: quiz.questions,
       participantsAnswered: new Set(),
-      timeoutId: null
+      timeoutId: null,
+      // Add a 10-minute overall quiz timer
+      quizEndTimeoutId: setTimeout(() => {
+        logger.info(`Quiz time limit reached for session ${sessionId}, ending quiz`);
+        endQuizEvent(quizId, eventId);
+      }, 10 * 60 * 1000) // 10 minutes in milliseconds
     });
     
     // Get the socket.io instance
@@ -197,8 +202,17 @@ async function endQuizEvent(quizId, eventId) {
     
     // Determine the winner
     if (event.participants.length > 0) {
-      // Sort participants by score (descending)
-      const sortedParticipants = [...event.participants].sort((a, b) => b.score - a.score);
+      // Sort participants by score (descending) and then by completion time if scores are equal
+      const sortedParticipants = [...event.participants].sort((a, b) => {
+        // First by score (highest first)
+        if (b.score !== a.score) return b.score - a.score;
+        
+        // Then by completion time (fastest first) if scores are equal
+        const aCompletionTime = a.answerTimes.reduce((sum, time) => sum + time, 0);
+        const bCompletionTime = b.answerTimes.reduce((sum, time) => sum + time, 0);
+        return aCompletionTime - bCompletionTime;
+      });
+      
       const winner = sortedParticipants[0];
       
       // Set the winner
@@ -206,6 +220,29 @@ async function endQuizEvent(quizId, eventId) {
         user: winner.user,
         score: winner.score
       };
+      
+      // Award premium subscription immediately
+      try {
+        // Get user object
+        const User = require('../models/user.model');
+        const user = await User.findById(winner.user);
+        
+        if (user) {
+          // Import the awardFreePremium function
+          const { awardFreePremium } = require('../controllers/subscription.controller');
+          
+          // Award free premium month to winner
+          const awarded = await awardFreePremium(user);
+          
+          if (awarded) {
+            logger.info(`Daily quiz winner ${user._id} awarded 1 month free premium subscription! Score: ${winner.score}`);
+          } else {
+            logger.warn(`Failed to award premium to user ${user._id}`);
+          }
+        }
+      } catch (error) {
+        logger.error('Error awarding premium to winner:', error);
+      }
     }
     
     await quiz.save();
@@ -214,8 +251,13 @@ async function endQuizEvent(quizId, eventId) {
     const sessionId = `${quizId}:${eventId}`;
     const session = activeQuizSessions.get(sessionId);
     
-    if (session && session.timeoutId) {
-      clearTimeout(session.timeoutId);
+    if (session) {
+      if (session.timeoutId) {
+        clearTimeout(session.timeoutId);
+      }
+      if (session.quizEndTimeoutId) {
+        clearTimeout(session.quizEndTimeoutId);
+      }
     }
     
     activeQuizSessions.delete(sessionId);
@@ -234,12 +276,15 @@ async function endQuizEvent(quizId, eventId) {
       eventId,
       winner: event.winner ? {
         userId: event.winner.user,
-        score: event.winner.score
+        score: event.winner.score,
+        premiumAwarded: true // Indicate that premium was awarded
       } : null,
       leaderboard: event.participants.map(p => ({
         userId: p.user,
         score: p.score,
-        correctAnswers: p.correctAnswers
+        correctAnswers: p.correctAnswers,
+        // Include total time for each participant
+        totalTime: p.answerTimes.reduce((sum, time) => sum + time, 0)
       })).sort((a, b) => b.score - a.score).slice(0, 10)
     });
     

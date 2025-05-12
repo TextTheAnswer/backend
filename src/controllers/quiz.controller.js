@@ -40,6 +40,11 @@ exports.getDailyQuestions = async (req, res) => {
       theme: {
         name: dailyQuiz.themeName,
         description: dailyQuiz.themeDescription
+      },
+      quizFormat: {
+        duration: 10, // 10 minutes total quiz time
+        questionTimeLimit: 15, // 15 seconds per question
+        premiumAward: true // Winner gets premium
       }
     });
   } catch (error) {

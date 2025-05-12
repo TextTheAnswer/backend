@@ -163,16 +163,30 @@ module.exports = function(io) {
           .map(p => ({
             userId: p.user,
             score: p.score,
-            correctAnswers: p.correctAnswers
+            correctAnswers: p.correctAnswers,
+            // Add total time
+            totalTime: p.answerTimes.reduce((sum, time) => sum + time, 0)
           }))
-          .sort((a, b) => b.score - a.score)
+          .sort((a, b) => {
+            // First by score (highest first)
+            if (b.score !== a.score) return b.score - a.score;
+            
+            // Then by completion time (fastest first) if scores are equal
+            return a.totalTime - b.totalTime;
+          })
           .slice(0, 10);
         
         // Send leaderboard to the user
         socket.emit('leaderboard-update', {
           quizId,
           eventId,
-          leaderboard
+          leaderboard,
+          // Add information about the quiz format
+          quizFormat: {
+            duration: 10, // 10 minutes total quiz time
+            questionTimeLimit: 15, // 15 seconds per question
+            premiumAward: true // Winner gets premium
+          }
         });
         
         logger.debug(`User ${socket.userId} requested leaderboard for event ${eventId}`);

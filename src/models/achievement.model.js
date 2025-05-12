@@ -17,12 +17,16 @@ const achievementSchema = new mongoose.Schema({
   criteria: {
     type: {
       type: String,
-      enum: ['streak', 'questions_answered', 'correct_answers', 'perfect_quizzes', 'multiplayer_wins', 'study_materials'],
+      enum: ['streak', 'questions_answered', 'correct_answers', 'perfect_quizzes', 'multiplayer_wins', 'study_materials', 'easter_egg'],
       required: true
     },
     value: {
       type: Number,
       required: true
+    },
+    additionalData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
     }
   },
   reward: {
@@ -44,6 +48,14 @@ const achievementSchema = new mongoose.Schema({
   premiumOnly: {
     type: Boolean,
     default: true
+  },
+  isHidden: {
+    type: Boolean,
+    default: false
+  },
+  hint: {
+    type: String,
+    default: null
   },
   createdAt: {
     type: Date,

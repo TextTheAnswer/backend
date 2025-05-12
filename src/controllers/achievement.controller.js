@@ -7,7 +7,9 @@ const logger = require('../utils/logger');
  */
 exports.getAllAchievements = async (req, res) => {
   try {
-    const achievements = await achievementService.getAllAchievements();
+    // Default to not showing hidden achievements for public endpoint
+    const includeHidden = false;
+    const achievements = await achievementService.getAllAchievements(includeHidden);
     
     res.status(200).json({
       success: true,
@@ -50,8 +52,11 @@ exports.getUserAchievements = async (req, res) => {
       });
     }
     
+    // Filter out any achievements with null/undefined achievementId before mapping
+    const validAchievements = result.achievements.filter(ach => ach && ach.achievementId);
+    
     // Format achievements for response
-    const formattedAchievements = result.achievements.map(ach => ({
+    const formattedAchievements = validAchievements.map(ach => ({
       id: ach.achievementId._id,
       name: ach.achievementId.name,
       description: ach.achievementId.description,
@@ -70,6 +75,73 @@ exports.getUserAchievements = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching achievements'
+    });
+  }
+};
+
+/**
+ * Get user's achievement progress - premium/education only
+ */
+exports.getAchievementProgress = async (req, res) => {
+  try {
+    // Check if user is on premium or education tier
+    if (req.user.subscription.status !== 'premium' && req.user.subscription.status !== 'education') {
+      return res.status(403).json({
+        success: false,
+        message: 'Achievements feature is only available for premium and education tier users',
+        upgradeRequired: true
+      });
+    }
+    
+    // Get achievement progress
+    const result = await achievementService.getAchievementProgress(req.user.id);
+    
+    if (result.isPremiumFeature) {
+      return res.status(403).json({
+        success: false,
+        message: 'Achievements feature is only available for premium and education tier users',
+        upgradeRequired: true
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      progress: result.progress
+    });
+  } catch (error) {
+    logger.error('Error fetching achievement progress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching achievement progress'
+    });
+  }
+};
+
+/**
+ * Get hidden/easter egg achievements - premium/education only
+ */
+exports.getHiddenAchievements = async (req, res) => {
+  try {
+    // Check if user is on premium or education tier
+    if (req.user.subscription.status !== 'premium' && req.user.subscription.status !== 'education') {
+      return res.status(403).json({
+        success: false,
+        message: 'Achievements feature is only available for premium and education tier users',
+        upgradeRequired: true
+      });
+    }
+    
+    const hiddenAchievements = await achievementService.getHiddenAchievements();
+    
+    res.status(200).json({
+      success: true,
+      hiddenAchievements
+    });
+  } catch (error) {
+    logger.error('Error fetching hidden achievements:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching hidden achievements'
     });
   }
 };
@@ -116,7 +188,17 @@ exports.markAchievementViewed = async (req, res) => {
  */
 exports.createAchievement = async (req, res) => {
   try {
-    const { name, description, icon, criteria, reward, tier, premiumOnly } = req.body;
+    const { 
+      name, 
+      description, 
+      icon, 
+      criteria, 
+      reward, 
+      tier, 
+      premiumOnly,
+      isHidden,
+      hint 
+    } = req.body;
     
     const achievement = new Achievement({
       name,
@@ -125,7 +207,9 @@ exports.createAchievement = async (req, res) => {
       criteria,
       reward: reward || { type: 'badge', value: 0 },
       tier: tier || 'bronze',
-      premiumOnly: premiumOnly !== false // Default to true if not specified
+      premiumOnly: premiumOnly !== false, // Default to true if not specified
+      isHidden: isHidden === true,
+      hint: hint || null
     });
     
     await achievement.save();
@@ -169,6 +253,43 @@ exports.deleteAchievement = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting achievement'
+    });
+  }
+};
+
+/**
+ * Trigger an easter egg achievement (admin only)
+ */
+exports.triggerEasterEgg = async (req, res) => {
+  try {
+    const { userId, achievementId } = req.body;
+    
+    if (!userId || !achievementId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required parameters: userId and achievementId'
+      });
+    }
+    
+    const success = await achievementService.unlockAchievement(userId, achievementId);
+    
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        message: 'Achievement not found or already unlocked'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Easter egg achievement triggered successfully'
+    });
+  } catch (error) {
+    logger.error('Error triggering easter egg achievement:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error triggering achievement',
+      error: error.message
     });
   }
 };

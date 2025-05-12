@@ -164,11 +164,10 @@ dailyQuizSchema.statics.getTodayQuiz = async function() {
       // Ensure we have exactly 10 questions (or at least what we could find)
       selectedQuestions = selectedQuestions.slice(0, 10);
       
-      // Create default event times (9AM, 3PM, 9PM UTC)
+      // Create default event times (only one event at 9AM UTC)
       const eventTimes = [
-        { hour: 9, minute: 0 },
-        { hour: 15, minute: 0 },
-        { hour: 21, minute: 0 }
+        { hour: 9, minute: 0 }
+        // Removed other events to have just one daily event
       ];
       
       // Create event objects
@@ -177,7 +176,7 @@ dailyQuizSchema.statics.getTodayQuiz = async function() {
         startTime.setHours(time.hour, time.minute, 0, 0);
         
         const endTime = new Date(startTime);
-        endTime.setMinutes(endTime.getMinutes() + 30); // 30-minute event
+        endTime.setMinutes(endTime.getMinutes() + 10); // 10-minute event instead of 30
         
         return {
           startTime,
@@ -324,11 +323,13 @@ dailyQuizSchema.statics.createQuizWithTheme = async function(date, themeId, ques
       throw new Error('Not enough questions in the database. Minimum 5 questions required.');
     }
     
-    // Create default event times (9AM, 3PM, 9PM UTC)
+    // Ensure we have exactly 10 questions (or at least what we could find)
+    questions = questions.slice(0, 10);
+    
+    // Create default event times (only one event at 9AM UTC)
     const eventTimes = [
-      { hour: 9, minute: 0 },
-      { hour: 15, minute: 0 },
-      { hour: 21, minute: 0 }
+      { hour: 9, minute: 0 }
+      // Removed other events to have just one daily event
     ];
     
     // Create event objects
@@ -337,7 +338,7 @@ dailyQuizSchema.statics.createQuizWithTheme = async function(date, themeId, ques
       startTime.setHours(time.hour, time.minute, 0, 0);
       
       const endTime = new Date(startTime);
-      endTime.setMinutes(endTime.getMinutes() + 30); // 30-minute event
+      endTime.setMinutes(endTime.getMinutes() + 10); // 10-minute event instead of 30
       
       return {
         startTime,
